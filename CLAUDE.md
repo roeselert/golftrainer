@@ -11,28 +11,41 @@ for the workflow that governs it.
 
 ## 1.1 System vision
 
-GolfTrainer lets a golfer record every stroke of a round on the course and
-review the round afterwards on a map, and lets the same golfer plan a hole
-stroke by stroke on a map before playing it. Capture happens where reception is
-worst — in the middle of a course — so the capture path works fully offline; the
-map view is an online-only feature layered on top of it.
+GolfTrainer serves a golfer in two sharply different situations. **On the
+course**, on a phone, they record every stroke as they play — no network, one
+hand, minimal interaction. **On the couch**, online, they work on a map: they
+replay a finished round, and they simulate a round in advance by placing
+intended strokes spot by spot.
+
+That split is the central architectural fact of this system. It is not one app
+used in two places; it is one body of data reached through two contexts with
+opposite constraints.
+
+| | On the course | On the couch |
+|---|---|---|
+| Device | Phone, in hand, in sunlight | Phone or larger screen, relaxed |
+| Network | Assume none | Assume yes |
+| Map | Not required *(see [OPEN-2])* | The whole point |
+| Interaction budget | Seconds, gloved, one hand | Unbounded |
+| Activities | Capture strokes (UC1) | Review (UC2), simulate (UC3) |
 
 ### Main use cases
 
-| # | Actor | Goal |
-|---|-------|------|
-| UC1 | Golfer | Capture each stroke while playing a round, without network and with minimal interaction |
-| UC2 | Golfer | Review a completed round on a map, seeing where each stroke started and ended |
-| UC3 | Golfer | Plan a hole in advance by placing intended strokes on a map |
-| UC4 | Golfer | Compare a played round against the plan for that hole *(candidate — see [OPEN-5])* |
+| # | Actor | Context | Goal |
+|---|-------|---------|------|
+| UC1 | Golfer | Course, offline | Capture each stroke while playing, with minimal interaction and no network |
+| UC2 | Golfer | Couch, online | Replay a completed round on a map, seeing where each stroke started and ended |
+| UC3 | Golfer | Couch, online | Simulate a round in advance by placing intended strokes on a map, spot by spot |
+| UC4 | Golfer | Couch, online | Compare a played round against the simulation for that hole *(candidate — see [OPEN-5])* |
 
 ### Value proposition
 
 Golfers already carry a phone but lose the shot-by-shot record of a round: paper
 scorecards capture strokes but not positions, and map-based apps stop working
 where cell coverage does. Without GolfTrainer the spatial record of a round —
-where the ball actually went, versus where it was meant to go — is lost by the
-time the golfer reaches the clubhouse. Planning and reality are never compared.
+where the ball actually went — is lost by the time the golfer reaches the
+clubhouse, and the simulated round the golfer worked out at home has nothing to
+be measured against.
 
 ### Quality goals
 
@@ -97,41 +110,46 @@ system must degrade cleanly without it.
 
 ## 1.4 Business components
 
-Draft — business capabilities, not frameworks. Refine once [OPEN-1..5] are answered.
+Draft — business capabilities, not frameworks. Refine once the open questions
+are answered.
 
 ```mermaid
 flowchart TB
-    subgraph capture["Round Capture — offline"]
-        round["Round<br/><i>owns: rounds, holes played</i>"]
+    subgraph oncourse["On the course — offline"]
+        round["Round Capture<br/><i>owns: rounds, holes played</i>"]
         stroke["Stroke Log<br/><i>owns: strokes, positions</i>"]
+        loc["Positioning<br/><i>GNSS access</i>"]
     end
 
-    subgraph planning["Hole Planning — online"]
-        plan["Stroke Plan<br/><i>owns: planned strokes</i>"]
-    end
-
-    subgraph review["Round Review — online"]
-        viz["Map Visualisation"]
+    subgraph couch["On the couch — online"]
+        sim["Round Simulation<br/><i>owns: simulated strokes</i>"]
+        viz["Map Visualisation<br/><i>replay & place on map</i>"]
     end
 
     course["Course Catalogue<br/><i>owns: courses, holes, tees, greens</i>"]
-    loc["Positioning<br/><i>GNSS access</i>"]
     store["Local Store<br/><i>owns: persistence</i>"]
 
     round --> stroke
     round --> course
     stroke --> loc
-    plan --> course
+    sim --> course
+    sim --> viz
     viz --> round
-    viz --> plan
     round --> store
-    plan --> store
+    sim --> store
     course --> store
 ```
 
-**Boundary rule:** nothing in *Round Capture* may depend on *Map Visualisation*
-or on any online component. That dependency direction is what makes QG1 hold,
-and the agentic review checks it explicitly.
+**Boundary rule (non-negotiable):** nothing in the *on the course* group may
+depend on anything in the *on the couch* group, or on any online component.
+Dependencies cross that line in one direction only — Map Visualisation reads
+Round Capture's data, never the reverse. That single rule is what makes QG1
+hold rather than merely be asserted, and the agentic review checks it
+explicitly on every change.
+
+Note that *Course Catalogue* sits outside both groups and is reachable from
+both — it is therefore on the offline critical path, which constrains where its
+data can come from ([OPEN-4]).
 
 ---
 
@@ -145,11 +163,20 @@ as short ADR rows: `Decision | Chosen | Alternatives considered | Rationale`.
 
 ## Open questions
 
+### Resolved
+
+- **Platform** — mobile device with GPS. *Which* mobile technology is still
+  open; recorded as OPEN-1 below.
+- **Simulation context** — UC3 is a couch activity, online and map-first, not
+  something done at the course. Reflected in §1.1 and §1.4.
+
+### Still open
+
 | # | Question | Why it blocks |
 |---|----------|---------------|
-| OPEN-1 | Platform: mobile app (which — native/cross-platform?), or installable web app? | Determines the entire stack; QG1 and GNSS access constrain the options sharply |
-| OPEN-2 | On the course with no network, what does the golfer see when marking a stroke — a bare "mark my position" button, a blank canvas, or cached tiles from a pre-round download? | Decides whether "map = online only" also means "no map on the course", and shapes the core capture screen |
-| OPEN-3 | How is a stroke recorded? One tap at the ball's position (start), or start + end per stroke? Is club/lie/penalty captured too? | Defines the core entity and the interaction budget for QG2 |
-| OPEN-4 | Where does course/hole data come from — a provider, drawn by the user during planning, or inferred from the captured positions? | Adds or removes an external system from §1.3 |
-| OPEN-5 | Is plan-vs-actual comparison (UC4) in scope, or are planning and capture independent features? | Determines whether the two components share a model or stay decoupled |
-| OPEN-6 | Single device, single golfer only — or does a round ever need to sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
+| OPEN-1 | Which mobile technology — native (Kotlin/Swift), cross-platform (Flutter, React Native), or installable PWA? | Determines the whole stack. Offline capture and GNSS access rule out little; developer familiarity probably decides it |
+| OPEN-2 | On the course with no network, what does the golfer see when marking a stroke — a bare "mark my position" button, a schematic hole with no imagery, or tiles pre-downloaded before teeing off? | Decides whether "map = online only" also means "no map on the course". Shapes the single most important screen in the app |
+| OPEN-3 | How is a stroke recorded? One tap at the ball's position, or start + end per stroke? Is club, lie, or penalty captured too? | Defines the core entity and the interaction budget for QG2 |
+| OPEN-4 | Where does course/hole data come from — a provider, drawn by the golfer while simulating, or inferred from captured positions? | Course Catalogue is on the offline critical path, so an online-only source would breach the boundary rule |
+| OPEN-5 | Is plan-vs-actual comparison (UC4) in scope? | Determines whether Round Capture and Round Simulation share a stroke model or stay fully decoupled |
+| OPEN-6 | Single device only, or does a round ever sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
