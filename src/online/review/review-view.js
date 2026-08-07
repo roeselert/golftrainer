@@ -254,11 +254,11 @@ async function mapSection(outlet, holes) {
   try {
     const created = await createMap(container, {
       centre: first ? { latitude: first.latitude, longitude: first.longitude } : null,
+      onTrouble: (message) => outlet.insertBefore(notice('warn', message), container),
     });
     map = created.map;
     leaflet = created.leaflet;
     attribution.textContent = created.basemap.attribution;
-    if (created.basemap.note) outlet.insertBefore(notice('info', created.basemap.note), container);
   } catch (error) {
     outlet.replaceChild(
       notice('warn', `The map could not be loaded: ${describeError(error)}`),

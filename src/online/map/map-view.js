@@ -7,7 +7,7 @@
  * the library would rewrite this file and nothing else.
  */
 
-import { basemapFor, isWms, wmsLayerName } from './tile-access.js';
+import { BASEMAPS, defaultBasemap } from './tile-access.js';
 
 /** @type {Promise<any> | undefined} */
 let leafletModule;
@@ -90,30 +90,52 @@ export function groupCoincident(items) {
  * @param {object} options
  * @param {{ latitude: number, longitude: number } | null} options.centre
  * @param {number} [options.zoom]
+ * @param {(message: string) => void} [options.onTrouble] Called once if imagery will not load.
  * @returns {Promise<{ map: any, leaflet: any, basemap: import('./tile-access.js').BasemapLayer }>}
  */
-export async function createMap(container, { centre, zoom = 16 }) {
+export async function createMap(container, { centre, zoom = 16, onTrouble }) {
   const leaflet = await loadLeaflet();
-  const basemap = basemapFor(centre);
+  const basemap = defaultBasemap();
 
   const map = leaflet.map(container, {
     center: [centre?.latitude ?? 51.163, centre?.longitude ?? 10.448],
     zoom: centre ? zoom : 6,
   });
 
-  const layer = isWms(basemap)
-    ? leaflet.tileLayer.wms(basemap.url, {
-        layers: wmsLayerName(basemap),
-        format: 'image/jpeg',
-        maxZoom: basemap.maxZoom,
-        attribution: basemap.attribution,
-      })
-    : leaflet.tileLayer(basemap.url, {
-        maxZoom: basemap.maxZoom,
-        attribution: basemap.attribution,
-      });
+  /** @type {Record<string, any>} */
+  const choices = {};
+  for (const definition of BASEMAPS) {
+    choices[definition.label] = leaflet.tileLayer(definition.url, {
+      maxZoom: definition.maxZoom,
+      attribution: definition.attribution,
+    });
+  }
 
-  layer.addTo(map);
+  const active = choices[basemap.label];
+  active.addTo(map);
+
+  // A layer switcher, because the golfer is the only one who can see whether
+  // the imagery is any good on their course — and because a map that will not
+  // load imagery should still be a usable map.
+  leaflet.control.layers(choices, {}, { position: 'topright' }).addTo(map);
+
+  /**
+   * Imagery that fails to load is the failure this whole file exists to stop
+   * being silent. One missing tile at the edge of coverage is normal; a wall of
+   * them means the service is unreachable, and the golfer is owed a sentence
+   * rather than a grey rectangle.
+   */
+  let failures = 0;
+  let reported = false;
+  active.on('tileerror', () => {
+    failures += 1;
+    if (failures < 4 || reported) return;
+    reported = true;
+    onTrouble?.(
+      'The aerial imagery is not loading. Switch to "Map" with the control at the top right, or try again later.',
+    );
+  });
+
   return { map, leaflet, basemap };
 }
 

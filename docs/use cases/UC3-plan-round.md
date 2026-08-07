@@ -122,14 +122,14 @@ The `RoundHole` survives; its strokes do not.
 
 ## 4. Exception flows
 
-| #   | Condition                                                            | System response                                                                                                                                                                 |
-| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E1  | The device is offline                                                | The planner refuses to open and says why: it needs the map, and the map is online only. It does not open a mapless degraded mode — that is car mode, and car mode is UC1        |
-| E2  | The connection drops mid-plan                                        | Strokes already placed are saved; the store is local, so nothing is lost. Tiles stop loading and the system says so rather than showing empty grey squares                      |
-| E3  | The tile provider fails or rate-limits                               | Reported plainly. The plan is not corrupted by the absence of a basemap                                                                                                         |
-| E4  | The golfer taps a spot implausibly far from the tee (more than 1 km) | Accepted, but flagged. A mis-tap on a zoomed-out map is easy and expensive to notice later                                                                                      |
-| E5  | The store write fails                                                | The stroke is reported as not placed and is not drawn. The map never shows a stroke the store does not have                                                                     |
-| E6  | The course lies outside the orthophoto coverage                      | The map falls back to OSM standard tiles and says so. Planning on a street map is worse but not impossible; pretending the imagery is still loading would be worse still (TD7a) |
+| #   | Condition                                                            | System response                                                                                                                                                          |
+| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| E1  | The device is offline                                                | The planner refuses to open and says why: it needs the map, and the map is online only. It does not open a mapless degraded mode — that is car mode, and car mode is UC1 |
+| E2  | The connection drops mid-plan                                        | Strokes already placed are saved; the store is local, so nothing is lost. Tiles stop loading and the system says so rather than showing empty grey squares               |
+| E3  | The tile provider fails or rate-limits                               | Reported plainly. The plan is not corrupted by the absence of a basemap                                                                                                  |
+| E4  | The golfer taps a spot implausibly far from the tee (more than 1 km) | Accepted, but flagged. A mis-tap on a zoomed-out map is easy and expensive to notice later                                                                               |
+| E5  | The store write fails                                                | The stroke is reported as not placed and is not drawn. The map never shows a stroke the store does not have                                                              |
+| E6  | The imagery service will not load tiles                              | Reported, with the layer switcher named. Planning on a street map is worse but not impossible; pretending the imagery is still loading would be worse still (TD7a)       |
 
 ## 5. Business rules
 

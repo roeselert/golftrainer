@@ -100,7 +100,7 @@ flowchart TB
     end
 
     gnss["GNSS / GPS<br/><i>device location services</i>"]
-    tiles["Basemap services<br/><i>state orthophotos (CC BY) · OSM tiles</i><br/><i>online only, no account</i>"]
+    tiles["Basemap services<br/><i>aerial imagery · OSM tiles</i><br/><i>online only, no account</i>"]
     storage[("Device storage<br/><i>on-device, offline</i>")]
     host["GitHub Pages<br/><i>static host — install & update only</i>"]
 
@@ -216,7 +216,7 @@ the rule allows — the golfer enters the course, so there is nothing to fetch.
 | TD5 | Persistence | **PGlite** (Postgres compiled to WASM, `@electric-sql/pglite`) | Raw IndexedDB, localStorage, SQLite/wa-sqlite | One relational schema shared by both contexts (§1.4), real SQL for the spatial and plan-vs-actual queries UC2/UC4 need, and transactions that serve QG3. Dual-licensed Apache-2.0 / PostgreSQL |
 | TD6 | Positioning | **Geolocation API** (`watchPosition`) | Device-specific GNSS APIs | The only option available to a PWA; sufficient for stroke positions |
 | TD7 | Map library | **Leaflet** (BSD-2-Clause), vendored like PGlite, with the tile source behind the Tile Access component | Google Maps JS SDK; Mapbox GL JS; MapLibre GL JS | Leaflet is a single JS + CSS file with no build step (TD2) and it treats the basemap as a URL template, which keeps Tile Access a seam rather than a framework. See TD7a for why that seam is the whole decision |
-| TD7a | Basemap imagery | **German state orthophotos (DOP20, 20 cm, CC BY 4.0)** — Schleswig-Holstein and Niedersachsen via their open WMS/WMTS — with **OSM standard tiles** as the non-imagery fallback | Google Maps; Esri World Imagery; Mapbox Satellite; OSM only | Keyless, billing-free, no contract, and higher resolution than the use cases need. Attribution is one line. Google was the favourite and is rejected on terms, not on price or quality: its "No Use With Non-Google Maps" clause forbids showing its content alongside or inside any other map and forbids access outside its own SDK, so choosing it would replace the seam with a vendor's map API. OSM alone was never a candidate — it has no imagery, and a fairway the golfer cannot see is not a basemap |
+| TD7a | Basemap imagery | **Esri World Imagery** (keyless XYZ) as the default, with **OSM standard tiles** as the switchable non-imagery layer. German state orthophotos are parked — see below | Google Maps; German state DOP20 via WMS; Mapbox Satellite; OSM only | Keyless, billing-free, global, and — decisively — consumable as a plain XYZ template with no per-service parameter that has to be guessed. Google was the favourite and is rejected on terms, not on price or quality: its "No Use With Non-Google Maps" clause forbids showing its content alongside or inside any other map and forbids access outside its own SDK, so choosing it would replace the seam with a vendor's map API. OSM alone was never a candidate — it has no imagery, and a fairway the golfer cannot see is not a basemap |
 | TD9 | PGlite delivery | **Served from our own origin and precached; reproduced into `vendor/` by `npm run vendor`, not committed** | CDN import at runtime (jsDelivr); committing `vendor/` to git | A CDN fetch on the offline critical path would breach the dependency rule in §1.4 — the WASM must be on the device before the first tee. It is *generated* rather than committed because it is 17 MB of binary per version, and git history cannot shed it on the next upgrade |
 | TD10 | Enforcing the dependency rule | **ESLint, failing the build** | Convention and review; a custom dependency-graph checker | An architecture rule that only lives in prose erodes. `no-restricted-imports` blocks imports from `src/online/` into `src/offline/`, and `no-restricted-globals` blocks `fetch`/`XMLHttpRequest`/`WebSocket`/`EventSource` there — so the offline core cannot quietly grow a network call either |
 | TD11 | Hosting | **GitHub Pages**, deployed from CI on the default branch | A VPS; Netlify/Vercel; Cloudflare Pages | Static hosting over HTTPS is all a PWA needs — no server, no runtime, nothing to operate. HTTPS is not optional: service workers and the Geolocation API both require a secure context, so QG1 and UC1 depend on it |
@@ -256,21 +256,35 @@ Recorded because they are load-bearing, not incidental:
 - **Attribution is a functional requirement, not a footer.** CC BY 4.0 obliges
   us to name the source, and Leaflet's attribution control has to carry whatever
   the active layer requires — which changes when the layer does.
-- **Coverage is national, and the app has to say so.** Outside the states whose
-  orthophotos we use, there is no imagery and the map falls back to OSM
-  standard tiles. That is a visible degradation and is specified as one
-  (UC2 E7, UC3 E6) rather than left to look like a loading failure.
+- **Coverage is global now, which removed a specified degradation.** The
+  orthophotos stopped at state borders, so UC2 E7 and UC3 E6 described falling
+  back to a street map outside them. The default imagery covers the world, so
+  those exceptions now describe a service that is unreachable rather than a
+  place that is uncovered — the golfer is told, and can switch layers.
 - **Rejecting Google also rejects tile caching, permanently and by choice.**
   Their terms forbid it anyway, but the open services do not — so the option of
   precaching a course's imagery stays open if the "no offline map" non-goal is
   ever revisited. Nothing in this decision closes that door.
-- **One assumption is unverified.** The Schleswig-Holstein WMTS was not
-  reachable from the machine this decision was researched on, so whether it
-  offers a Web-Mercator (`GoogleMapsCompatible`) tile matrix set is unconfirmed.
-  If it does, Leaflet consumes it as a plain XYZ template; if it only publishes
-  ETRS89/UTM32 (EPSG:25832), Tile Access uses the WMS endpoint instead. This is
-  the first thing to check when UC2 is built, and it changes an implementation
-  detail, not the decision.
+- **The orthophotos are parked, and why is the useful part.** They are still the
+  better imagery for the courses this app was built for — 20 cm, CC BY 4.0, no
+  key — but they are served as WMS, and a WMS request needs an exact `LAYERS`
+  name published in a GetCapabilities document. That document was unreachable
+  from the machine this was built on, so the names were guessed. A WMS server
+  answers a wrong layer name with an XML exception, which Leaflet renders as
+  *nothing at all*: the first version of the map shipped with no imagery on it
+  and no error to explain why.
+
+  Two lessons are now in the code. An unverifiable parameter is a bug waiting to
+  happen, so the default is a service that needs none. And imagery that fails
+  must say so — Tile Access counts tile errors and tells the golfer to switch
+  layers, rather than leaving a grey rectangle.
+
+  Bringing DOP20 back needs one string, confirmed by someone with a browser
+  (OPEN-10). Nothing else about the decision changes.
+- **The golfer can switch layers**, and that is a feature rather than a
+  fallback. Only they can see whether the imagery is any good on their course,
+  and no test in CI will ever tell us — the tile hosts are unreachable from
+  there too.
 
 ### TD8 — Storage durability on iOS (serves QG3)
 
@@ -494,4 +508,4 @@ on the course.
 |---|----------|---------------|
 | OPEN-5 | Is plan-vs-actual comparison (UC4) in scope, and for which release? | No longer an architectural question — the shared domain model (§1.4) already makes it expressible. Now purely a scope/priority call |
 | OPEN-6 | Single device only, or does a round ever sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
-| OPEN-10 | Does the Schleswig-Holstein WMTS publish a Web-Mercator tile matrix set, or only ETRS89/UTM32? | Decides whether Tile Access consumes it as an XYZ template or through WMS. An implementation detail of TD7a, not a reopening of it — first thing to check when UC2 is built |
+| OPEN-10 | What are the exact WMS `LAYERS` names for the Schleswig-Holstein and Niedersachsen DOP20 services? | Needs one GetCapabilities request from a browser. With them, TD7a's preferred 20 cm imagery comes back as an option beside the current default; without them it stays parked, because a guessed layer name renders as an empty map |

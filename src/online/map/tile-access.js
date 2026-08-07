@@ -9,124 +9,93 @@
  *
  * One rule is easy to break by accident and must not be:
  *
- *   **Which imagery covers a course is resolved here, from the position, at
- *   display time. It never becomes a column on `Course`.**
+ *   **Which imagery covers a course is resolved here, at display time. It never
+ *   becomes a column on `Course`.**
  *
  * `Course` lives in the offline core, and a tile provider is an online concern.
- * Putting it in the catalogue would breach the dependency rule (§1.4).
+ *
+ * ---
+ *
+ * A correction, recorded because the first version of this file shipped a map
+ * with no imagery on it at all.
+ *
+ * TD7a chose the German state orthophotos, and they are still the best imagery
+ * for the courses this app was built for: 20 cm, CC BY 4.0, no key. But they
+ * are served as WMS, and a WMS request needs an exact `LAYERS` name that is
+ * published in a GetCapabilities document. That document was not reachable from
+ * the machine this was written on, so the names were guessed — and a WMS server
+ * answers a wrong layer name with an XML exception, which Leaflet renders as
+ * nothing whatsoever. A silent grey map.
+ *
+ * So the default is now a plain XYZ imagery service that needs no per-service
+ * parameters to be guessed. The orthophotos come back the moment someone with a
+ * browser can read the capabilities document and fill in one string — that is
+ * OPEN-10, and it is now a smaller question than it was.
  */
 
 /**
  * @typedef {object} BasemapLayer
  * @property {string} id
- * @property {string} url          XYZ template, consumed directly by Leaflet.
- * @property {string} attribution  Shown wherever the layer is (BR7 — CC BY 4.0).
+ * @property {string} label       Shown in the layer switcher.
+ * @property {string} url         XYZ template, consumed directly by Leaflet.
+ * @property {string} attribution Shown wherever the layer is (BR7).
  * @property {number} maxZoom
- * @property {boolean} imagery     False means "a street map, not a photograph".
- * @property {string} [note]       Shown to the golfer when it is not imagery.
+ * @property {boolean} imagery    False means "a street map, not a photograph".
  */
 
 /**
- * Rough bounding boxes, deliberately generous at the edges.
+ * Aerial imagery, worldwide, with no key and no billing account.
  *
- * Coverage follows state borders, and a course near one is better served by
- * trying the imagery and falling back than by a precise polygon nobody
- * maintains. A wrong guess costs a blank tile, not a wrong map.
- *
- * @type {readonly { id: string, south: number, west: number, north: number, east: number, layer: BasemapLayer }[]}
- */
-const IMAGERY_REGIONS = Object.freeze([
-  {
-    id: 'schleswig-holstein',
-    south: 53.35,
-    west: 7.85,
-    north: 55.06,
-    east: 11.32,
-    layer: {
-      id: 'dop20-sh',
-      // WMS rather than WMTS until OPEN-10 is answered: whether the tile matrix
-      // set is Web Mercator is unconfirmed, and WMS with EPSG:3857 works either
-      // way. Leaflet's WMS support takes the same shape as an XYZ template.
-      url: 'https://service.gdi-sh.de/WMS_SH_DOP20col_OpenGBD',
-      attribution: 'Luftbilder DOP20 © GeoBasis-DE/LVermGeo SH (CC BY 4.0)',
-      maxZoom: 20,
-      imagery: true,
-    },
-  },
-  {
-    id: 'niedersachsen',
-    south: 51.29,
-    west: 6.65,
-    north: 53.89,
-    east: 11.6,
-    layer: {
-      id: 'dop20-ni',
-      url: 'https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms',
-      attribution: 'Luftbilder DOP20 © LGLN (CC BY 4.0)',
-      maxZoom: 20,
-      imagery: true,
-    },
-  },
-]);
-
-/**
- * Everywhere the orthophotos do not reach.
- *
- * OSM was never a candidate for the imagery itself — it has none, and a fairway
- * the golfer cannot see is not a basemap. It is a fallback that keeps the map
- * usable and says plainly that it is not a photograph (UC2 E7, UC3 E6).
+ * Note the `{z}/{y}/{x}` order — this service puts row before column, and
+ * getting it the usual way round yields tiles from the wrong hemisphere rather
+ * than an error, which is a debugging afternoon nobody needs.
  *
  * @type {BasemapLayer}
  */
-export const FALLBACK_LAYER = Object.freeze({
+export const SATELLITE = Object.freeze({
+  id: 'esri-world-imagery',
+  label: 'Satellite',
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  attribution: 'Imagery © Esri, Maxar, Earthstar Geographics and the GIS User Community',
+  maxZoom: 19,
+  imagery: true,
+});
+
+/**
+ * The fallback, and the thing to show when imagery will not load.
+ *
+ * OSM was never a candidate for the imagery itself — it has none, and a fairway
+ * the golfer cannot see is not a basemap. It is here so that a failing imagery
+ * service degrades to a usable map rather than to a grey void.
+ *
+ * @type {BasemapLayer}
+ */
+export const STREET = Object.freeze({
   id: 'osm',
+  label: 'Map',
   url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   attribution: '© OpenStreetMap contributors',
   maxZoom: 19,
   imagery: false,
-  note: 'No aerial imagery covers this course, so this is a street map.',
 });
 
+/** Every basemap the golfer can choose, imagery first. @type {readonly BasemapLayer[]} */
+export const BASEMAPS = Object.freeze([SATELLITE, STREET]);
+
 /**
- * Picks the basemap for a position.
+ * The layer a map opens on. Imagery, always: a golf hole seen as a street map
+ * is a green rectangle with no fairway, no bunkers and no green.
  *
- * @param {{ latitude: number, longitude: number } | null} position
  * @returns {BasemapLayer}
  */
-export function basemapFor(position) {
-  if (!position) return FALLBACK_LAYER;
-
-  const region = IMAGERY_REGIONS.find(
-    (candidate) =>
-      position.latitude >= candidate.south &&
-      position.latitude <= candidate.north &&
-      position.longitude >= candidate.west &&
-      position.longitude <= candidate.east,
-  );
-
-  return region ? region.layer : FALLBACK_LAYER;
+export function defaultBasemap() {
+  return SATELLITE;
 }
 
 /**
- * Whether a layer is served as WMS rather than as XYZ tiles.
- *
- * The German state services publish WMS endpoints; OSM publishes XYZ. Leaflet
- * needs to be told which, and this keeps that knowledge in Tile Access rather
- * than spread across the two screens that draw maps.
- *
- * @param {BasemapLayer} layer
- * @returns {boolean}
+ * @param {string} id
+ * @returns {BasemapLayer}
  */
-export function isWms(layer) {
-  return !layer.url.includes('{z}');
-}
-
-/**
- * The WMS layer name to request. Each state names its own.
- *
- * @param {BasemapLayer} layer
- * @returns {string}
- */
-export function wmsLayerName(layer) {
-  return layer.id === 'dop20-ni' ? 'ni_dop20' : 'sh_dop20col';
+export function basemapById(id) {
+  return BASEMAPS.find((layer) => layer.id === id) ?? SATELLITE;
 }

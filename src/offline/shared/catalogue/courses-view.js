@@ -256,7 +256,17 @@ async function renderCourse(outlet, context, courseId) {
     el('h3', { class: 'card__title', text: 'Tee positions' }),
     el('p', {
       class: 'hint',
-      text: 'Stand on the tee and capture it. The course works without any of these.',
+      text: 'Stand on the tee and capture it, or place them all on a map from home. The course works without any of these.',
+    }),
+    // Navigation, not an import: the map screen is an online capability and
+    // this file is in the offline core (§1.4). Tapping it loads that screen;
+    // being offline refuses it at the door, with the course still usable here.
+    el('button', {
+      class: 'action',
+      type: 'button',
+      id: 'place-tees-on-map',
+      text: 'Place tees on a map',
+      onclick: () => navigate('tees', { course: courseId }),
     }),
     holesList,
   );
