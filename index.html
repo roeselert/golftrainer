@@ -13,11 +13,20 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
     <!--
-      iOS ignores the manifest when adding to the home screen and reads this
-      instead, so it is not a duplicate of the manifest icons — it is the only
-      icon the platform TD8 is about will ever see.
+      iOS ignores the manifest when adding to the home screen and reads these
+      instead, so they are not duplicates of the manifest icons — they are the
+      only icons the platform TD8 is about will ever see. Three sizes because
+      iOS asks for three: iPad, iPad Pro, and iPhone at @3x.
+
+      They are opaque by construction (tools/make-icons.mjs). iOS composites an
+      alpha channel onto black, so a transparent corner is a black corner.
     -->
-    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
+    <!-- The home-screen label. Without it iOS uses <title>, which is a thing
+         a screen could one day want to change. -->
+    <meta name="apple-mobile-web-app-title" content="GolfTrainer" />
     <meta name="theme-color" content="#1b4332" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

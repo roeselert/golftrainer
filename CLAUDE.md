@@ -428,6 +428,18 @@ on the course.
   round-hole row on arrival, so walking to the eighteenth tee and quitting left
   a round containing a hole nobody played — counted in every total downstream.
   Hole rows are now created by the first write to them.
+- **A home-screen icon with an alpha channel.** iOS composites transparency in
+  an `apple-touch-icon` onto black, so a corner the artwork failed to cover
+  becomes a black corner on the home screen — on the one platform TD8 exists
+  for, and nowhere a developer would look. The generator paints the background
+  itself rather than trusting the artwork to, and a test reads the PNG header
+  and rejects an alpha channel.
+- **An offline refusal that depended on a race.** `requiresNetwork` used to live
+  inside the route module, so the router had to fetch a screen to learn it could
+  not open it. Whichever failed first — the import or the guard — wrote the
+  message, and the two environments disagreed: locally the module loaded from
+  the dev server despite the emulated offline, in CI it did not. The flag now
+  sits on the route entry, so being offline is decided before any request.
 
 ---
 

@@ -95,6 +95,8 @@ test('the icons the home screen uses are real images, and survive going offline'
 
   const decoded = await page.evaluate(async () => {
     const sources = [
+      'icons/icon-152.png',
+      'icons/icon-167.png',
       'icons/icon-180.png',
       'icons/icon-192.png',
       'icons/icon-512.png',
