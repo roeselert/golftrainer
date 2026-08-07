@@ -14,10 +14,20 @@
  */
 
 /**
- * @typedef {object} Route
+ * A destination, as the shell knows it *before* loading anything.
+ *
+ * `requiresNetwork` lives here rather than inside the module, and that placement
+ * is the whole point: the router has to answer "can this screen open?" without
+ * fetching the screen. With the flag inside the module, being offline produced
+ * whichever error won a race — the failed import or the guard — so the same
+ * situation had two different explanations depending on whether the module
+ * happened to be in an HTTP cache. Now the offline case is decided first, no
+ * request is made, and the golfer gets one answer.
+ *
+ * @typedef {object} RouteEntry
  * @property {string} name
- * @property {(outlet: HTMLElement, context: any) => Promise<void> | void} render
- * @property {boolean} [requiresNetwork]  Refused offline, with an explanation.
+ * @property {boolean} [requiresNetwork]
+ * @property {() => Promise<{ render: (outlet: HTMLElement, context: any) => Promise<void> | void }>} load
  */
 
 /**
@@ -43,7 +53,7 @@ export function href(path, params = {}) {
 /**
  * @param {object} options
  * @param {HTMLElement} options.outlet
- * @param {Record<string, () => Promise<Route> | Route>} options.routes
+ * @param {Record<string, RouteEntry>} options.routes
  * @param {(outlet: HTMLElement, message: string) => void} options.onUnavailable
  * @param {() => any} options.context
  * @returns {{ start: () => Promise<void>, navigate: (path: string, params?: Record<string, string>) => void }}
@@ -58,30 +68,29 @@ export function createRouter({ outlet, routes, onUnavailable, context }) {
   async function show() {
     const mine = ++generation;
     const { path, params } = parseHash(window.location.hash);
-    const load = table.get(path) ?? table.get('home');
-    if (!load) return;
+    const entry = table.get(path) ?? table.get('home');
+    if (!entry) return;
+
+    // Decided before the import, so an online-only screen gives one answer
+    // rather than whichever of two errors arrives first.
+    if (entry.requiresNetwork && !navigator.onLine) {
+      onUnavailable(outlet, `${entry.name} needs a network connection.`);
+      return;
+    }
 
     let route;
     try {
-      route = await load();
-    } catch (error) {
-      // A screen that cannot even be fetched is almost always the offline case:
-      // the online capabilities are deliberately not precached (§1.4).
-      onUnavailable(
-        outlet,
-        `That screen could not be loaded${navigator.onLine ? '' : ' — you are offline'}.`,
-      );
-      void error;
+      route = await entry.load();
+    } catch {
+      // The online capabilities are deliberately not precached (§1.4), so this
+      // is a genuinely broken deployment rather than the everyday offline case
+      // — that one was answered above.
+      onUnavailable(outlet, `${entry.name} could not be loaded.`);
       return;
     }
 
     // A slower route that lost the race must not paint over a newer one.
     if (mine !== generation) return;
-
-    if (route.requiresNetwork && !navigator.onLine) {
-      onUnavailable(outlet, `${route.name} needs a network connection.`);
-      return;
-    }
 
     outlet.replaceChildren();
     await route.render(outlet, { ...context(), params, navigate });

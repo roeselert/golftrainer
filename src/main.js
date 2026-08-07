@@ -172,26 +172,28 @@ async function main() {
     context: () => ({ db: database, durability }),
     onUnavailable: renderUnavailable,
     routes: {
-      home: () => ({ name: 'Home', render: renderHome }),
-      courses: async () => ({
+      home: { name: 'Home', load: async () => ({ render: renderHome }) },
+      courses: {
         name: 'Courses',
-        render: (await import('./offline/shared/catalogue/courses-view.js')).render,
-      }),
-      track: async () => ({
+        load: () => import('./offline/shared/catalogue/courses-view.js'),
+      },
+      track: {
         name: 'Track round',
-        render: (await import('./offline/capture/capture-view.js')).render,
-      }),
-      // Online (§1.4). Not precached, loaded on navigation, refused offline.
-      rounds: async () => ({
+        load: () => import('./offline/capture/capture-view.js'),
+      },
+      // Online (§1.4). Not precached, loaded on navigation, and refused offline
+      // before the import is attempted — the shell knows they need a network
+      // without having to fetch them to find out.
+      rounds: {
         name: 'Show round',
         requiresNetwork: true,
-        render: (await import('./online/review/review-view.js')).render,
-      }),
-      plan: async () => ({
+        load: () => import('./online/review/review-view.js'),
+      },
+      plan: {
         name: 'Plan round',
         requiresNetwork: true,
-        render: (await import('./online/planner/planner-view.js')).render,
-      }),
+        load: () => import('./online/planner/planner-view.js'),
+      },
     },
   });
 
