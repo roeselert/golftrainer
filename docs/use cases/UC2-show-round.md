@@ -109,15 +109,16 @@ figures, the golfer jumps straight to that hole's map.
 
 ## 5. Business rules
 
-| #   | Rule                                                                                                                                                                                                                                                                                        |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BR1 | This use case is read-only. It never edits, repairs or normalises a round it displays                                                                                                                                                                                                       |
-| BR2 | Played and planned rounds are shown by the same views. One model, one renderer                                                                                                                                                                                                              |
-| BR3 | A hole's route is: tee position, then every stroke position in sequence order. Putts add no points                                                                                                                                                                                          |
-| BR4 | Totals are computed from what is stored, never adjusted to look plausible. A round that disagrees with the scorecard is shown as it was recorded (see OPEN-9)                                                                                                                               |
-| BR5 | Positions are shown with their accuracy, so the golfer can tell a 3 m fix from a 40 m one                                                                                                                                                                                                   |
-| BR6 | The overview and the table need no network, but they live in the online half for now. Making them reachable on the course would mean moving them into the offline core, and nothing in UC1 asks for that — car mode (TD3) is the on-course experience. This is a decision, not an oversight |
-| BR7 | Basemap attribution is visible wherever tiles are shown (§1.2)                                                                                                                                                                                                                              |
+| #   | Rule                                                                                                                                                                                                                                                                                                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BR1 | This use case is read-only. It never edits, repairs or normalises a round it displays                                                                                                                                                                                                                |
+| BR2 | Played and planned rounds are shown by the same views. One model, one renderer                                                                                                                                                                                                                       |
+| BR3 | A hole's route is: tee position, then every stroke position in sequence order. Putts add no points                                                                                                                                                                                                   |
+| BR4 | Totals are computed from what is stored, never adjusted to look plausible. A round is shown as it was recorded                                                                                                                                                                                       |
+| BR5 | Positions are shown with their accuracy, so the golfer can tell a 3 m fix from a 40 m one                                                                                                                                                                                                            |
+| BR6 | The overview and the table need no network, but they live in the online half for now. Making them reachable on the course would mean moving them into the offline core, and nothing in UC1 asks for that — car mode (TD3) is the on-course experience. This is a decision, not an oversight          |
+| BR7 | Basemap attribution is visible wherever tiles are shown (§1.2)                                                                                                                                                                                                                                       |
+| BR8 | **Coincident stroke positions are never merged.** Two strokes at one spot is how a penalty is recorded (UC1 A6), so a map that collapses them into one marker deletes a stroke the golfer took. They are drawn as a stack carrying the count, and the table lists them as the separate rows they are |
 
 ## 6. Data requirements
 
@@ -166,6 +167,13 @@ _Given_ the device is offline,
 _when_ the golfer opens the map view,
 _then_ the system says the map needs a network and does not render a blank
 canvas as if it were a course.
+
+**AC7 — A penalty is visible as two strokes, not one**
+_Given_ a hole where strokes 2 and 3 were recorded at the same position (UC1
+A6),
+_when_ the golfer views that hole,
+_then_ the table shows both rows, the map marks the spot as carrying two
+strokes, and the hole's total counts both.
 
 ## 8. Open questions
 

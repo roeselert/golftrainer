@@ -132,15 +132,17 @@ The `RoundHole` survives; its strokes do not.
 
 ## 5. Business rules
 
-| #   | Rule                                                                                                                                                                                                     |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BR1 | A planned stroke's position is where the ball is **intended to come to rest** — identical semantics to a captured stroke (UC1 BR1). That symmetry is what makes UC4 a query                              |
-| BR2 | A planned stroke has `accuracy = null` and `fixedAt = null`. Those two nulls are how a plan is told apart from a capture at the field level, and `Round.kind` is how it is told apart at the round level |
-| BR3 | Planning never writes to a round with `kind = PLAYED`, and capture never writes to a `PLANNED` one                                                                                                       |
-| BR4 | A course may have any number of plans. A plan is not a property of a course                                                                                                                              |
-| BR5 | Planned putts are an intention, stored in the same field as recorded putts                                                                                                                               |
-| BR6 | The planner may read and write the offline core's domain model. The offline core may not know the planner exists — no import, no event, no shared type carrying a map concern (§1.4, enforced by TD10)   |
-| BR7 | Basemap attribution is visible wherever tiles are shown (§1.2)                                                                                                                                           |
+| #   | Rule                                                                                                                                                                                                                                               |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BR1 | A planned stroke's position is where the ball is **intended to come to rest** — identical semantics to a captured stroke (UC1 BR1). That symmetry is what makes UC4 a query                                                                        |
+| BR2 | A planned stroke has `accuracy = null` and `fixedAt = null`. Those two nulls are how a plan is told apart from a capture at the field level, and `Round.kind` is how it is told apart at the round level                                           |
+| BR3 | Planning never writes to a round with `kind = PLAYED`, and capture never writes to a `PLANNED` one                                                                                                                                                 |
+| BR4 | A course may have any number of plans. A plan is not a property of a course                                                                                                                                                                        |
+| BR5 | Planned putts are an intention, stored in the same field as recorded putts                                                                                                                                                                         |
+| BR6 | The planner may read and write the offline core's domain model. The offline core may not know the planner exists — no import, no event, no shared type carrying a map concern (§1.4, enforced by TD10)                                             |
+| BR7 | Basemap attribution is visible wherever tiles are shown (§1.2)                                                                                                                                                                                     |
+| BR8 | The club picker offers the same twelve clubs as the capture grid (UC1 BR11), from the same enumeration. It need not use the same layout — there is no glove and no group waiting here                                                              |
+| BR9 | A plan contains no penalty strokes. A penalty is a second stroke at the same position (UC1 A6), which is a thing that happens, not a thing anyone intends. Nothing forbids placing two strokes on one spot; it is simply never the point of a plan |
 
 ## 6. Data requirements
 
@@ -191,7 +193,5 @@ _then_ both pass.
 
 - **OPEN-7** — the basemap. Satellite imagery is the obviously useful thing for
   a golf hole, and is also the licensing question (§1.2).
-- **OPEN-8** — the club list, shared with UC1. On the couch a long list is
-  cheap; on the course it is not, and one enumeration serves both.
 - Does a plan target a specific date or upcoming round, or is it just "a plan
   for this course"? The model says the latter. UC4 may want the former.

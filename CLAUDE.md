@@ -374,8 +374,7 @@ Both are silent failures: they look fine in development and break on the course.
 - **OPEN-3 — how a stroke is recorded** — one tap on the club the golfer just
   used, standing at the ball; the position is the current fix, so a stroke
   records *where the ball came to rest*, not where it was struck from. Putts are
-  a count entered when the hole is finished. Lie and penalty are not captured
-  (see OPEN-9). Specified in
+  a count entered when the hole is finished. Specified in
   [UC1](docs/use%20cases/UC1-track-round.md); the same semantics give a planned
   stroke in [UC3](docs/use%20cases/UC3-plan-round.md) its meaning, which is what
   keeps UC4 a query rather than a project.
@@ -384,6 +383,18 @@ Both are silent failures: they look fine in development and break on the course.
   a course is usable with no tee positions at all. No provider, no import, so
   the Course Catalogue keeps its place in the offline shared foundation with
   nothing to fetch. Specified in [UC5](docs/use%20cases/UC5-manage-courses.md).
+- **OPEN-8 — which clubs** — a fixed bag of twelve: driver, irons 4–9, four
+  wedges, putter. Not configurable, no woods, no hybrids. Twelve is a car-mode
+  layout decision (QG2) before it is a data one — three across and four down
+  fits a phone, fourteen glove-sized targets does not. `Club` is a column on
+  every stroke, so this is settled before the first migration rather than grown
+  afterwards. Specified in [UC1](docs/use%20cases/UC1-track-round.md) BR11.
+- **OPEN-9 — penalty strokes and lie** — a penalty is recorded as **a second
+  stroke at the same position**: the golfer taps the club again without moving.
+  No field on `Stroke`, no button on the grid, and the hole's total matches the
+  scorecard because two strokes at one spot is what actually happened. Lie is
+  not captured at all. The cost is one rule downstream — UC2 may not merge
+  coincident points, or it would silently delete the penalty (UC2 BR8).
 
 ### Still open
 
@@ -392,5 +403,3 @@ Both are silent failures: they look fine in development and break on the course.
 | OPEN-5 | Is plan-vs-actual comparison (UC4) in scope, and for which release? | No longer an architectural question — the shared domain model (§1.4) already makes it expressible. Now purely a scope/priority call |
 | OPEN-6 | Single device only, or does a round ever sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
 | OPEN-7 | Which basemap/tile provider for the couch views — OSM-based (Leaflet + a tile host), Mapbox, Google? Satellite imagery or vector? | Licensing and attribution obligations (see §1.2). Couch-only, so it does not affect QG1 and can wait until UC2 |
-| OPEN-8 | Which clubs does the capture grid offer — a fixed list, or the golfer's own bag, configured once? | `Club` is a field on every stroke, so the enumeration lands in the first schema migration. Fourteen glove-sized targets is also a car-mode layout problem (QG2) |
-| OPEN-9 | Are penalty strokes and lie captured at all? | UC1 as specified records neither, so a round with a penalty stores fewer strokes than the scorecard shows. Cheap to live with now, expensive to retrofit once real rounds exist |

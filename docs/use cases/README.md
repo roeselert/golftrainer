@@ -131,9 +131,30 @@ entity Stroke {
 }
 ```
 
-`Club` is an enumeration and not yet fixed — see [OPEN-8](#still-open).
+`Club` is a fixed enumeration of twelve values — a standard bag, not a
+configurable one:
 
-### Two rules that hold across every use case
+```
+Club =
+  DRIVER
+  IRON_4 | IRON_5 | IRON_6 | IRON_7 | IRON_8 | IRON_9
+  PITCHING_WEDGE | GAP_WEDGE | SAND_WEDGE | LOB_WEDGE
+  PUTTER
+```
+
+Twelve is the number that matters, because it is a car-mode layout before it is
+a data type: three columns by four rows of glove-sized targets fits a phone,
+where fourteen does not (QG2). Four families, in the order the bag is used —
+driver, irons, wedges, putter.
+
+Two consequences worth stating rather than discovering later:
+
+- **No woods and no hybrids.** They are one enum value and one grid cell each
+  when the golfer wants them, and a migration that only ever adds values.
+- **Adding a club is a migration.** The enumeration is a column on every stroke,
+  so it is settled here, before the first table exists, rather than grown.
+
+### Three rules that hold across every use case
 
 - **A stroke's position is where the ball came to rest**, not where it was
   struck from. The start of stroke _n_ is the position of stroke _n-1_; the
@@ -141,21 +162,25 @@ entity Stroke {
   that symmetry is the whole reason UC4 will be cheap.
 - **Putts are a count, not strokes.** They have no positions, they are entered
   once when the hole is finished, and they are not rows in `Stroke`.
+- **A penalty stroke is a second stroke at the same position.** The golfer
+  records it by tapping the club again without moving. That costs no field, no
+  button and no extra concept: the ball did not advance, and two strokes at one
+  spot is exactly what happened. Everything downstream must respect it —
+  in particular UC2 may not merge coincident points, because merging them would
+  silently delete the penalty.
 
 ## Decisions these specs settle
 
-| Question in `CLAUDE.md`               | Settled where | Decision                                                                                                                                              |
-| ------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OPEN-3 — how a stroke is recorded     | UC1 BR1       | One tap: the golfer taps the club they used, standing at the ball. Position comes from the current fix. No start/end pair, no lie, no penalty stroke. |
-| OPEN-4 — where course data comes from | UC5           | The golfer enters it. No provider, no import, nothing to be online for. Tee positions are captured on the tee or placed on the map later.             |
+| Question in `CLAUDE.md`               | Settled where | Decision                                                                                                                                  |
+| ------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| OPEN-3 — how a stroke is recorded     | UC1 BR1       | One tap: the golfer taps the club they used, standing at the ball. Position comes from the current fix. No start/end pair, no lie.        |
+| OPEN-4 — where course data comes from | UC5           | The golfer enters it. No provider, no import, nothing to be online for. Tee positions are captured on the tee or placed on the map later. |
+| OPEN-8 — which clubs                  | UC1 BR11      | A fixed bag of twelve: driver, irons 4–9, four wedges, putter. Not configurable, no woods, no hybrids.                                    |
+| OPEN-9 — penalty strokes and lie      | UC1 BR12      | A penalty is a second stroke at the same position — no field, no button. Lie is not captured at all.                                      |
 
 ## Still open
 
-Questions these specs raise and do not answer. They block the acceptance
-criteria they are named in, not the whole use case.
-
-| #      | Question                                                                                                                     | Blocks   |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------- | -------- |
-| OPEN-8 | Which clubs does the grid show — a fixed list, or the golfer's own bag? A 14-club grid on a phone is a big grid.             | UC1, UC3 |
-| OPEN-9 | Are penalty strokes and lie captured? UC1 as specified records neither, so the stroke count can disagree with the scorecard. | UC1      |
-| OPEN-7 | Which basemap and tile provider (`CLAUDE.md` TD7).                                                                           | UC2, UC3 |
+| #      | Question                                                          | Blocks   |
+| ------ | ----------------------------------------------------------------- | -------- |
+| OPEN-7 | Which basemap and tile provider (`CLAUDE.md` TD7).                | UC2, UC3 |
+| OPEN-5 | Whether plan-versus-actual (UC4) is built, and for which release. | UC4      |

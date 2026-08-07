@@ -41,7 +41,8 @@
 3. The golfer taps a course. The system opens a round (`kind = PLAYED`,
    `startedAt = now`) and proposes hole 1.
 4. The golfer taps **Start hole**. The system opens the hole and shows the club
-   grid — hole number, strokes so far, one large target per club.
+   grid — hole number, strokes so far, and the twelve clubs of the bag as twelve
+   large targets, three across and four down (BR11).
 5. The golfer plays the stroke, walks to the ball, and taps the club they used.
 6. The system takes the current position fix, appends the stroke, and confirms
    it — club and stroke number, large enough to read at arm's length in
@@ -151,7 +152,19 @@ hole is finished with putts only, or with nothing at all. A `RoundHole` with
 zero strokes is valid data, not a defect — it says "played, not recorded",
 which is true and worth keeping.
 
-## 4. Exception flows
+**A6 — A penalty stroke.** Water, out of bounds, an unplayable lie: the stroke
+counts and the ball did not advance. The golfer records it by **tapping the club
+again without moving** — a second stroke, at the same position, on the same
+hole. Nothing else changes: no penalty button, no field on `Stroke`, no separate
+concept for the map or the totals to handle.
+
+That is exact rather than merely convenient. Two strokes at one spot is what
+happened, so the hole's total matches the scorecard, and the route in UC2 shows
+a ball that did not move. Where the golfer drops and plays on, the drop is
+recorded like any other stroke: they are standing at it when they tap.
+
+The one thing it costs is downstream care — UC2 may not merge coincident points
+(UC2 BR8), because merging them would delete the penalty.
 
 | #   | Condition                                            | System response                                                                                                                                                                                         |
 | --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -165,18 +178,21 @@ which is true and worth keeping.
 
 ## 5. Business rules
 
-| #    | Rule                                                                                                                                                                                                                                                                            |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BR1  | **A stroke's recorded position is where the ball came to rest**, and its club is the club that put it there. The start of stroke _n_ is the position of stroke _n-1_; the start of stroke 1 is the hole's tee position when the catalogue has one. This is the answer to OPEN-3 |
-| BR2  | **One tap records a stroke.** Tapping the club is the whole interaction — no confirm step, no separate "capture position" action, no typing anywhere in this use case (QG2)                                                                                                     |
-| BR3  | Putts are entered once, as a count, when the hole is finished. They are not strokes and have no positions                                                                                                                                                                       |
-| BR4  | A hole's total is `recorded strokes + putts`. The system never invents a stroke to make that total match a scorecard                                                                                                                                                            |
-| BR5  | Every stroke is committed in its own transaction, at the moment it is tapped. There is no "save round" step, because a save step is a thing that can fail to happen (QG3)                                                                                                       |
-| BR6  | Stroke sequences are contiguous from 1 within a hole                                                                                                                                                                                                                            |
-| BR7  | **No network call may occur anywhere in this use case**, and no code path may reach an online capability. Enforced by ESLint (TD10), not by review                                                                                                                              |
-| BR8  | No map is shown. On the course the golfer is in car mode (TD3)                                                                                                                                                                                                                  |
-| BR9  | A round has exactly one course and `kind = PLAYED`. This use case never touches a `PLANNED` round                                                                                                                                                                               |
-| BR10 | Only one round may be in progress at a time                                                                                                                                                                                                                                     |
+| #    | Rule                                                                                                                                                                                                                                                                                                              |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BR1  | **A stroke's recorded position is where the ball came to rest**, and its club is the club that put it there. The start of stroke _n_ is the position of stroke _n-1_; the start of stroke 1 is the hole's tee position when the catalogue has one. This is the answer to OPEN-3                                   |
+| BR2  | **One tap records a stroke.** Tapping the club is the whole interaction — no confirm step, no separate "capture position" action, no typing anywhere in this use case (QG2)                                                                                                                                       |
+| BR3  | Putts are entered once, as a count, when the hole is finished. They are not strokes and have no positions                                                                                                                                                                                                         |
+| BR4  | A hole's total is `recorded strokes + putts`. The system never invents a stroke to make that total match a scorecard                                                                                                                                                                                              |
+| BR5  | Every stroke is committed in its own transaction, at the moment it is tapped. There is no "save round" step, because a save step is a thing that can fail to happen (QG3)                                                                                                                                         |
+| BR6  | Stroke sequences are contiguous from 1 within a hole                                                                                                                                                                                                                                                              |
+| BR7  | **No network call may occur anywhere in this use case**, and no code path may reach an online capability. Enforced by ESLint (TD10), not by review                                                                                                                                                                |
+| BR8  | No map is shown. On the course the golfer is in car mode (TD3)                                                                                                                                                                                                                                                    |
+| BR9  | A round has exactly one course and `kind = PLAYED`. This use case never touches a `PLANNED` round                                                                                                                                                                                                                 |
+| BR10 | Only one round may be in progress at a time                                                                                                                                                                                                                                                                       |
+| BR11 | The grid offers a **fixed bag of twelve** — driver, irons 4 to 9, four wedges, putter — in that order, laid out three across and four down. Not configurable, no woods, no hybrids. Twelve is a QG2 number before it is a data one: fourteen glove-sized targets do not fit a phone. This is the answer to OPEN-8 |
+| BR12 | **A penalty stroke is a second stroke at the same position** (A6). `Stroke` has no penalty field and the grid has no penalty button. Lie is not captured at all. This is the answer to OPEN-9                                                                                                                     |
+| BR13 | The putter is on the grid, and a stroke recorded with it is one played from **off** the green. Putts on the green stay a count (BR3) — the two are never the same row                                                                                                                                             |
 
 ## 6. Data requirements
 
@@ -245,19 +261,25 @@ _Given_ four strokes are recorded on hole 7,
 _when_ the golfer finishes the hole with 2 putts,
 _then_ the hole totals 6 and the round advances to hole 8.
 
-**AC10 — The offline core stands alone**
+**AC10 — A penalty costs one extra tap and nothing else**
+_Given_ the golfer has hit into water and is standing where they played from,
+_when_ they tap the same club a second time without moving,
+_then_ two strokes exist for that hole at effectively the same position, the
+hole's total is two higher, and no penalty-specific data was stored.
+
+**AC11 — Every club in the bag is reachable with a glove**
+_Given_ the hole screen is open,
+_when_ the twelve targets are measured,
+_then_ all twelve are visible without scrolling and each is at least 48 px in
+both dimensions.
+
+**AC12 — The offline core stands alone**
 _Given_ `src/online/` is deleted,
 _when_ the build and the offline suite run,
 _then_ both pass and this use case is fully exercised.
 
 ## 8. Open questions
 
-- **OPEN-8** — which clubs the grid offers. Fourteen targets that must stay
-  glove-sized is a layout problem as much as a data one; a per-golfer bag would
-  shrink it, at the cost of setup before the first round.
-- **OPEN-9** — penalty strokes and lie are not captured. A round with a
-  penalty therefore records fewer strokes than the scorecard, which is a
-  deliberate simplification and needs to be an accepted one.
 - Should the course list be ordered by proximity when a fix is available? It
   would save a scroll, and Positioning is already on this screen. Not specified
   here because it is a refinement of step 2, not a change to it.
