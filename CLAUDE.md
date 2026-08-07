@@ -165,17 +165,35 @@ data can come from ([OPEN-4]).
 | TD6 | Positioning | **Geolocation API** (`watchPosition`) | Device-specific GNSS APIs | The only option available to a PWA; sufficient for stroke positions |
 | TD7 | Basemap / tiles | **[OPEN-7]** | — | Couch-only, so it does not affect QG1. Deferred until UC2/UC3 are built |
 
-### Known risk of TD1 — iOS storage eviction vs QG3
+### TD8 — Storage durability on iOS (serves QG3)
 
-Safari evicts site data (including IndexedDB) after roughly seven days without
-use. Installed home-screen PWAs are treated more favourably, but the guarantee
-is weaker than a native app's. QG3 says a round is unrepeatable, so this is a
-real tension with TD1, not a theoretical one.
+| Decision | Chosen | Rationale |
+|---|---|---|
+| TD8 | **Require installation to the home screen, and request persistent storage** | The two conditions that together take iOS eviction off the table |
 
-Not a blocker — a round is normally reviewed within days — but it means
-**export must exist early**, and installation must be prompted rather than
-assumed. Revisit if rounds start being lost. This is the price of TD1, recorded
-so it is paid knowingly.
+WebKit's seven-day cap on script-writable storage (IndexedDB, localStorage,
+service worker registrations) applies to origins **in Safari** that have seen no
+user interaction across seven days of Safari use. Two documented carve-outs
+apply to us:
+
+1. **Home-screen web apps are exempt.** An installed PWA is not part of Safari,
+   keeps its own days-of-use counter, and its first-party data is not deleted
+   under this rule.
+2. **Persistent-mode origins are skipped by eviction.** Since Safari 17 the
+   Storage API is fully supported; `navigator.storage.persist()` moves an origin
+   out of the default best-effort mode, after which only the user can clear it.
+
+**Consequences for the build — both are functional requirements, not polish:**
+
+- Installation is part of onboarding, not an optional prompt. A round captured
+  in a *browser tab* is the case the seven-day rule still governs.
+- Call `navigator.storage.persist()` at first run and check `persisted()`. If
+  persistence is refused, say so plainly rather than pretending the round is safe.
+
+**Residual risk, honestly stated:** neither carve-out protects against
+device-level storage pressure, and iOS still enforces a per-origin quota. Round
+export therefore remains worth building — but as insurance against a rare case,
+not as a workaround for expected weekly data loss.
 
 ---
 
@@ -193,7 +211,7 @@ so it is paid knowingly.
 
 | # | Question | Why it blocks |
 |---|----------|---------------|
-| OPEN-3 | How is a stroke recorded? One tap at the ball's position, or start + end per stroke? Is club, lie, or penalty captured too? | Defines the core entity and the interaction budget for QG2. **Next question to answer** — it drives the first user story |
+| OPEN-3 | How is a stroke recorded? One tap at the ball's position, or start + end per stroke? Is club, lie, or penalty captured too? | Defines the core entity and the interaction budget for QG2. *Deferred by decision — to be settled in the UC1 use-case spec (Phase 3), not here* |
 | OPEN-4 | Where does course/hole data come from — a provider, drawn by the golfer while simulating, or inferred from captured positions? | Course Catalogue is on the offline critical path, so an online-only source would breach the boundary rule |
 | OPEN-5 | Is plan-vs-actual comparison (UC4) in scope? | Determines whether Round Capture and Round Simulation share a stroke model or stay fully decoupled |
 | OPEN-6 | Single device only, or does a round ever sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
