@@ -25,7 +25,7 @@ opposite constraints.
 |---|---|---|
 | Device | Phone, in hand, in sunlight | Phone or larger screen, relaxed |
 | Network | Assume none | Assume yes |
-| Map | Not required *(see [OPEN-2])* | The whole point |
+| Map | None at all — "car mode" (TD3) | The whole point |
 | Interaction budget | Seconds, gloved, one hand | Unbounded |
 | Activities | Capture strokes (UC1) | Review (UC2), simulate (UC3) |
 
@@ -57,9 +57,9 @@ Ordered — earlier goals win when they conflict.
 | QG2 | **Ease of use during play** | Capture competes with playing golf: one hand, gloves, bright sunlight, a group waiting. | Recording a stroke is a small, fixed number of interactions; no typing required mid-round |
 | QG3 | **Durability of captured data** | A round is unrepeatable. Losing it is worse than never capturing it. | Round survives app kill, battery death, and OS eviction mid-round |
 
-**Explicitly not a goal (for now):** map availability offline. Map display is an
-online-only feature by decision — see [OPEN-2] for what the golfer sees on the
-course instead.
+**Explicitly not a goal:** map availability offline. Map display is an
+online-only feature by decision. On the course the golfer sees "car mode"
+instead — large buttons, no map at all (TD3).
 
 ---
 
@@ -155,9 +155,27 @@ data can come from ([OPEN-4]).
 
 ## 1.5 Technology choices
 
-**[OPEN]** — no technology decided yet. Deliberately deferred until [OPEN-1]
-(platform) is answered, since it determines the whole stack. Decisions land here
-as short ADR rows: `Decision | Chosen | Alternatives considered | Rationale`.
+| # | Decision | Chosen | Alternatives considered | Rationale |
+|---|----------|--------|-------------------------|-----------|
+| TD1 | Platform | Installable **PWA** | Native (Kotlin/Swift), Flutter, React Native | One codebase, no app store, no release gatekeeper. Service workers and the Geolocation API cover everything QG1 and UC1 need |
+| TD2 | Language & framework | **Vanilla JS (ES modules), HTML, CSS** — no framework | React, Svelte, Lit, Vue | No build step, no toolchain rot, no framework upgrade treadmill. The UI is small and mostly non-reactive; a framework would be weight without leverage |
+| TD3 | On-course UI | **"Car mode"** — large tap targets, no map | Map-on-course with pre-cached tiles | Directly serves QG2 (gloved, one hand, sunlight). Also removes the last reason for the offline path to touch anything online — the boundary rule in §1.4 now holds by construction |
+| TD4 | Offline shell | **Service worker**, precached app shell | Cache-less, online-first | The app must launch from a cold start in airplane mode. Non-negotiable for QG1 |
+| TD5 | Persistence | **IndexedDB** | localStorage, OPFS | localStorage is ~5 MB, synchronous, and string-only — it would block the capture UI and lose structure. IndexedDB is transactional and survives eviction better, serving QG3 |
+| TD6 | Positioning | **Geolocation API** (`watchPosition`) | Device-specific GNSS APIs | The only option available to a PWA; sufficient for stroke positions |
+| TD7 | Basemap / tiles | **[OPEN-7]** | — | Couch-only, so it does not affect QG1. Deferred until UC2/UC3 are built |
+
+### Known risk of TD1 — iOS storage eviction vs QG3
+
+Safari evicts site data (including IndexedDB) after roughly seven days without
+use. Installed home-screen PWAs are treated more favourably, but the guarantee
+is weaker than a native app's. QG3 says a round is unrepeatable, so this is a
+real tension with TD1, not a theoretical one.
+
+Not a blocker — a round is normally reviewed within days — but it means
+**export must exist early**, and installation must be prompted rather than
+assumed. Revisit if rounds start being lost. This is the price of TD1, recorded
+so it is paid knowingly.
 
 ---
 
@@ -165,18 +183,18 @@ as short ADR rows: `Decision | Chosen | Alternatives considered | Rationale`.
 
 ### Resolved
 
-- **Platform** — mobile device with GPS. *Which* mobile technology is still
-  open; recorded as OPEN-1 below.
+- **Platform** — mobile device with GPS, as an installable PWA built in vanilla
+  JS/HTML/CSS. Recorded as TD1/TD2.
 - **Simulation context** — UC3 is a couch activity, online and map-first, not
   something done at the course. Reflected in §1.1 and §1.4.
+- **On-course screen** — "car mode": large buttons, no map. Recorded as TD3.
 
 ### Still open
 
 | # | Question | Why it blocks |
 |---|----------|---------------|
-| OPEN-1 | Which mobile technology — native (Kotlin/Swift), cross-platform (Flutter, React Native), or installable PWA? | Determines the whole stack. Offline capture and GNSS access rule out little; developer familiarity probably decides it |
-| OPEN-2 | On the course with no network, what does the golfer see when marking a stroke — a bare "mark my position" button, a schematic hole with no imagery, or tiles pre-downloaded before teeing off? | Decides whether "map = online only" also means "no map on the course". Shapes the single most important screen in the app |
-| OPEN-3 | How is a stroke recorded? One tap at the ball's position, or start + end per stroke? Is club, lie, or penalty captured too? | Defines the core entity and the interaction budget for QG2 |
+| OPEN-3 | How is a stroke recorded? One tap at the ball's position, or start + end per stroke? Is club, lie, or penalty captured too? | Defines the core entity and the interaction budget for QG2. **Next question to answer** — it drives the first user story |
 | OPEN-4 | Where does course/hole data come from — a provider, drawn by the golfer while simulating, or inferred from captured positions? | Course Catalogue is on the offline critical path, so an online-only source would breach the boundary rule |
 | OPEN-5 | Is plan-vs-actual comparison (UC4) in scope? | Determines whether Round Capture and Round Simulation share a stroke model or stay fully decoupled |
 | OPEN-6 | Single device only, or does a round ever sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
+| OPEN-7 | Which basemap/tile provider for the couch views — OSM-based (Leaflet + a tile host), Mapbox, Google? Satellite imagery or vector? | Licensing and attribution obligations (see §1.2). Couch-only, so it does not affect QG1 and can wait until UC2 |
