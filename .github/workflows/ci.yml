@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  signals:
+    name: Quality signals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` runs the postinstall hook, which vendors the PGlite runtime.
+      - run: npm ci
+
+      # Style (2.2.1)
+      - name: Lint
+        run: npm run lint
+      - name: Formatting
+        run: npm run format:check
+
+      # Static bug patterns (2.2.2) — type-aware checking of JSDoc-annotated JS.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Duplication (2.2.3)
+      - name: Duplication
+        run: npm run duplication
+
+      # Vulnerable dependencies (2.2.5). Security bug patterns (2.2.4) run as
+      # part of Lint via eslint-plugin-security.
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      # The offline suite is the only thing that can verify QG1: a real browser,
+      # a real service worker, a real cold start with the network cut.
+      - name: Offline end-to-end tests
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

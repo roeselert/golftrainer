@@ -1,0 +1,45 @@
+{
+  "name": "golftrainer",
+  "version": "0.1.0",
+  "description": "Record every stroke of a round on the course, then replay and simulate it on a map.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "vendor": "node tools/vendor-pglite.mjs",
+    "postinstall": "node tools/vendor-pglite.mjs",
+    "start": "node tools/serve.mjs",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p jsconfig.json",
+    "duplication": "jscpd src tools test",
+    "test:unit": "node --test 'test/**/*.test.js'",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit",
+    "signals": "npm run lint && npm run format:check && npm run typecheck && npm run duplication && npm audit --audit-level=high"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roeselert/golftrainer.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/roeselert/golftrainer/issues"
+  },
+  "homepage": "https://github.com/roeselert/golftrainer#readme",
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-security": "^4.0.1",
+    "globals": "^17.9.0",
+    "jscpd": "^5.0.14",
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2"
+  }
+}
