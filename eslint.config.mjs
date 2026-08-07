@@ -39,6 +39,10 @@ export default [
       'coverage/**',
       'report/**',
       'test-results/**',
+      // Playwright's HTML report bundles its own minified JavaScript. Without
+      // this, running the tests and then `npm run signals` locally lints the
+      // report instead of the app.
+      'playwright-report/**',
       '.claude/**',
       // Assembled deployment: copies of files already linted at their source.
       '_site/**',

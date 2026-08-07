@@ -4,11 +4,15 @@ Architecture documentation (arc42-inspired). This file is the architecture spine
 it is read first and updated last on every change. See `.claude/skills/timo_agentic_coding_process`
 for the workflow that governs it.
 
-> **Status:** Phase 3 started — the use cases are specified in
-> [`docs/use cases/`](docs/use%20cases/README.md); none is built. Phase 2 stands:
-> bootstrapped, deployed to GitHub Pages, every quality signal in CI. The shell
-> has a burger menu; of its four destinations only "load new version" is
-> implemented. Questions marked **[OPEN]** are unresolved.
+> **Status:** All four use cases are built and covered by tests —
+> [UC5](docs/use%20cases/UC5-manage-courses.md) courses,
+> [UC1](docs/use%20cases/UC1-track-round.md) capture,
+> [UC2](docs/use%20cases/UC2-show-round.md) review,
+> [UC3](docs/use%20cases/UC3-plan-round.md) planning. A full round can be
+> captured in airplane mode and replayed on a map afterwards. Every quality
+> signal runs in CI, including the offline suite against the deployed layout.
+> Questions marked **[OPEN]** are unresolved; the one that matters now is
+> OPEN-10, which needs a human with a browser rather than a decision.
 
 ---
 
@@ -289,7 +293,10 @@ apply to us:
 **Consequences for the build — both are functional requirements, not polish:**
 
 - Installation is part of onboarding, not an optional prompt. A round captured
-  in a *browser tab* is the case the seven-day rule still governs.
+  in a *browser tab* is the case the seven-day rule still governs. This is also
+  why the icons are a functional requirement rather than decoration: Chrome will
+  not offer to install without a 192 and a 512, and iOS ignores the manifest
+  entirely and reads `apple-touch-icon`. No icon, no home screen, no carve-out.
 - Call `navigator.storage.persist()` at first run and check `persisted()`. If
   persistence is refused, say so plainly rather than pretending the round is safe.
 
@@ -313,17 +320,28 @@ index.html              app shell
 sw.js                   service worker — precaches shell + PGlite (TD4)
 app-shell.json          precache list; verified against disk by a test
 manifest.webmanifest    installability, which TD8 depends on
+icons/                  icon.svg is the source; the PNGs are `npm run icons`
 
 src/
-  main.js               composition root; also the walking skeleton (TD4/5/8)
+  main.js               composition root; routes, menu, boot order
   shell/                navigation — belongs to neither context (TD13)
     menu.js             burger menu behaviour
+    router.js           hash routing; online routes load by dynamic import()
+    dom.js              the DOM vocabulary every screen is built from
     app-update.js       "load new version": clear caches, reinstall
   offline/              works with no network — may not import from online/
+    capture/            UC1 — the car-mode capture screen
+    positioning/        Geolocation, wrapped so a missing fix is a value (TD6)
     shared/             the shared foundation of §1.4
+      domain/           the bag of twelve clubs (UC1 BR11)
+      catalogue/        UC5 — courses, holes, tee positions
+      rounds/           rounds, holes and strokes; written by both contexts
       store/            PGlite connection + schema migrations
       durability/       TD8: request persistence, report refusal honestly
-  online/               may import from offline/ — currently empty
+  online/               may import from offline/ — never precached
+    map/                Leaflet wrapper + Tile Access (TD7/TD7a)
+    review/             UC2 — overview, stroke table, map
+    planner/            UC3 — place intended strokes on the map
 
 tools/                  vendor script, dev server
 test/                   unit tests (node:test)
@@ -342,7 +360,7 @@ run in CI on every push. `npm run signals` runs the lot locally.
 | 2.2.2 | Static bug patterns | TypeScript (`checkJs`) over JSDoc | Type safety with no build step — the code stays plain JS the browser runs directly (TD2) |
 | 2.2.3 | Duplication | jscpd | |
 | 2.2.4 | Security patterns | eslint-plugin-security | |
-| 2.2.5 | Vulnerable dependencies | `npm audit` | Trivially small surface: one runtime dependency |
+| 2.2.5 | Vulnerable dependencies | `npm audit` | Small surface: two runtime dependencies, PGlite and Leaflet |
 | 2.2.6 | **Architecture conformance** | ESLint (TD10) | The dependency rule of §1.4, enforced rather than reviewed |
 | 2.2.7 | **Offline capability** | Playwright | QG1 verified in a real browser: load, cut the network, close the page, reopen it |
 | 2.2.8 | **Deployment shape** | Playwright | The same offline suite against the assembled site mounted at `/golftrainer/`, the layout GitHub Pages actually serves (TD12) |
@@ -357,18 +375,27 @@ the whole architecture rests on.
 npm run site   →  _site/   →  GitHub Pages
 ```
 
-`tools/build-site.mjs` copies exactly the files the two precache manifests
-name, plus `sw.js` and the vendor manifest. Nothing is compiled or bundled, so
-TD2 still holds: what is served is what is in the repository.
+`tools/build-site.mjs` copies what the precache manifests name, plus `sw.js`,
+the vendor manifests, Leaflet, and everything under `src/online/`. Nothing is
+compiled or bundled, so TD2 still holds: what is served is what is in the
+repository.
 
-Deriving the deployment from the precache list keeps one list honest instead of
-two. A file that is not precached does not work on the course, so publishing it
-would be pointless — and a file that is precached but not published breaks the
-service worker's install outright.
+For the offline half, deriving the deployment from the precache list keeps one
+list honest instead of two. A file that is not precached does not work on the
+course, so publishing it would be pointless — and a file that is precached but
+not published breaks the service worker's install outright.
 
-### 2.4 Three traps this bootstrap closes
+**The online half breaks that equivalence, deliberately.** Its modules and
+Leaflet are *deployed but never precached*: they have to be served, because a
+navigation loads them, but precaching them would put a map library into the
+download the golfer makes before teeing off — for screens that refuse to open
+without a network anyway. `test/app-shell.test.js` asserts the boundary in both
+directions: every offline module precached, no online module precached.
 
-Both are silent failures: they look fine in development and break on the course.
+### 2.4 Traps this build has closed
+
+Every one of them is a silent failure: it looks fine in development and breaks
+on the course.
 
 - **A stale precache list.** With no build step there is nothing to derive the
   service worker's file list from, so `app-shell.json` is hand-maintained. A
@@ -391,6 +418,16 @@ Both are silent failures: they look fine in development and break on the course.
   to prevent. Being offline is therefore a hard refusal, not a warning, and the
   worker is unregistered rather than merely emptied so the reload rebuilds the
   precache instead of quietly running network-only.
+- **A menu that is present but dead while the database boots.** PGlite takes
+  seconds to open from cold. Wiring the burger menu after that `await` left the
+  button rendered and unresponsive for the whole window — a tap that does
+  nothing, on the first tee, which is precisely what QG2 is about. Navigation is
+  now wired before anything is awaited, and an e2e test taps the menu without
+  waiting for the database.
+- **A hole created by looking at it.** The capture screen used to create the
+  round-hole row on arrival, so walking to the eighteenth tee and quitting left
+  a round containing a hole nobody played — counted in every total downstream.
+  Hole rows are now created by the first write to them.
 
 ---
 

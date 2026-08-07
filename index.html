@@ -11,10 +11,13 @@
       including the root.
     -->
     <link rel="manifest" href="manifest.webmanifest" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23f2f7f3'/%3E%3Cg fill='%23a8c0b0'%3E%3Ccircle cx='11' cy='12' r='2'/%3E%3Ccircle cx='19' cy='11' r='2'/%3E%3Ccircle cx='16' cy='18' r='2'/%3E%3Ccircle cx='23' cy='17' r='2'/%3E%3Ccircle cx='10' cy='20' r='2'/%3E%3C/g%3E%3C/svg%3E"
-    />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <!--
+      iOS ignores the manifest when adding to the home screen and reads this
+      instead, so it is not a duplicate of the manifest icons — it is the only
+      icon the platform TD8 is about will ever see.
+    -->
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
     <meta name="theme-color" content="#1b4332" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -218,13 +221,352 @@
         display: block;
         color: var(--fail);
       }
+
+      /*
+        Screens.
+
+        Every interactive target below is at least 3rem, and the club grid is
+        4rem. That is not a style preference: UC1 AC11 measures it, because the
+        golfer is wearing a glove and the group behind is watching.
+      */
+      .brand {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .screen__header {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        margin: 0 0 1rem;
+      }
+
+      .screen__title {
+        font-size: 1.5rem;
+        margin: 0;
+      }
+
+      .screen__subtitle {
+        color: var(--muted);
+        font-size: 0.9375rem;
+        margin: 0.125rem 0 0;
+      }
+
+      .back {
+        flex: none;
+        min-width: 3rem;
+        min-height: 3rem;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+      }
+
+      .tile {
+        min-height: 5rem;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        font-size: 1.125rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .card__title {
+        font-size: 1.125rem;
+        margin: 0 0 0.75rem;
+      }
+
+      .card__actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+
+      .field {
+        width: 100%;
+        min-height: 3rem;
+        padding: 0 0.75rem;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.5rem;
+        font-size: 1.0625rem;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 0.9375rem;
+        margin: 0.75rem 0 0.5rem;
+      }
+
+      .choices {
+        display: flex;
+        gap: 0.75rem;
+      }
+
+      .choice {
+        flex: 1;
+        min-height: 3.5rem;
+        background: #1d3b29;
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .action {
+        min-height: 3rem;
+        padding: 0 1rem;
+        background: #1d3b29;
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .action--quiet {
+        background: transparent;
+      }
+
+      .action--danger {
+        border-color: #6b2b2b;
+        color: #ffc9c9;
+      }
+
+      .list {
+        list-style: none;
+        margin: 0 0 1.5rem;
+        padding: 0;
+        display: grid;
+        gap: 0.5rem;
+      }
+
+      .list__item {
+        width: 100%;
+        min-height: 3.5rem;
+        display: block;
+        text-align: left;
+        padding: 0.625rem 0.875rem;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        cursor: pointer;
+      }
+
+      .list__title {
+        display: block;
+        font-size: 1.0625rem;
+        font-weight: 600;
+      }
+
+      .list__detail {
+        display: block;
+        color: var(--muted);
+        font-size: 0.875rem;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-height: 3.5rem;
+        padding: 0.5rem 0.875rem;
+        background: var(--surface);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+      }
+
+      .row__label {
+        font-weight: 600;
+        min-width: 4.5rem;
+      }
+
+      .row__detail {
+        flex: 1;
+        font-size: 0.875rem;
+      }
+
+      .row__detail--muted {
+        color: var(--muted);
+      }
+
+      .row__action {
+        min-height: 3rem;
+        padding: 0 0.875rem;
+        background: #1d3b29;
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        cursor: pointer;
+      }
+
+      /* The club grid — three across, four down, twelve clubs (UC1 BR11). */
+      .clubs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.625rem;
+        margin: 1rem 0;
+      }
+
+      .club {
+        min-height: 4rem;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        font-size: 1.375rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .club:active {
+        background: #24503a;
+      }
+
+      .tally {
+        font-size: 1.0625rem;
+        margin: 0.5rem 0;
+      }
+
+      .last-stroke {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        min-height: 3rem;
+      }
+
+      .last-stroke:empty {
+        display: none;
+      }
+
+      .undo {
+        min-height: 3rem;
+        padding: 0 1.25rem;
+        background: transparent;
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .putts__grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 0.5rem;
+      }
+
+      .putt {
+        min-height: 3.5rem;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        font-size: 1.25rem;
+        cursor: pointer;
+      }
+
+      .hole-nav {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin: 1rem 0;
+      }
+
+      .notice {
+        padding: 0.75rem 0.875rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid var(--muted);
+        background: var(--surface);
+        margin: 0 0 0.75rem;
+        font-size: 0.9375rem;
+      }
+
+      .notice--ok {
+        border-left-color: var(--ok);
+      }
+      .notice--warn {
+        border-left-color: var(--warn);
+      }
+      .notice--fail {
+        border-left-color: var(--fail);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+      .warn-text {
+        color: var(--warn);
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9375rem;
+      }
+
+      .table th,
+      .table td {
+        text-align: left;
+        padding: 0.5rem 0.5rem;
+        border-bottom: 1px solid #24503a;
+      }
+
+      .table th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .scroll-x {
+        overflow-x: auto;
+        margin-bottom: 1.5rem;
+      }
+
+      /* The map (TD7). Height is fixed so tiles have somewhere to land. */
+      .map {
+        height: 60vh;
+        min-height: 20rem;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        background: #0d1c14;
+        margin-bottom: 0.75rem;
+      }
+
+      .attribution {
+        color: var(--muted);
+        font-size: 0.8125rem;
+        margin: 0 0 1.5rem;
+      }
     </style>
   </head>
   <body>
     <header class="appbar">
       <div>
-        <h1>GolfTrainer</h1>
-        <p class="lede">Bootstrap check — offline shell, local database, storage durability.</p>
+        <h1><a class="brand" href="#/">GolfTrainer</a></h1>
       </div>
 
       <button
@@ -239,28 +581,35 @@
       </button>
 
       <!--
-        Three items are disabled and say so. They are the destinations the app
-        is being built towards; showing them as if they worked would be a lie
-        the first tap exposes.
+        Reviewing and planning say that they need a network, because they do:
+        they are online capabilities (§1.4) and are not precached. Tracking a
+        round and managing courses carry no such warning, because they carry no
+        such dependency.
       -->
       <nav id="menu" class="menu" hidden aria-label="Main menu">
         <ul class="menu__list">
           <li>
-            <button class="menu__item" type="button" data-action="track-round" disabled>
+            <button class="menu__item" type="button" data-action="track-round">
               Track round
-              <span class="menu__hint">Not built yet — needs a course to play first</span>
+              <span class="menu__hint">Capture strokes on the course. Works offline.</span>
             </button>
           </li>
           <li>
-            <button class="menu__item" type="button" data-action="plan-round" disabled>
-              Plan round
-              <span class="menu__hint">Not built yet — needs the map</span>
-            </button>
-          </li>
-          <li>
-            <button class="menu__item" type="button" data-action="manage-courses" disabled>
+            <button class="menu__item" type="button" data-action="manage-courses">
               Manage courses
-              <span class="menu__hint">Not built yet — the first thing that will be</span>
+              <span class="menu__hint">Add a course and its tees. Works offline.</span>
+            </button>
+          </li>
+          <li>
+            <button class="menu__item" type="button" data-action="show-round">
+              Show round
+              <span class="menu__hint">Replay a round on the map. Needs a network.</span>
+            </button>
+          </li>
+          <li>
+            <button class="menu__item" type="button" data-action="plan-round">
+              Plan round
+              <span class="menu__hint">Place intended strokes on the map. Needs a network.</span>
             </button>
           </li>
           <li>
@@ -276,7 +625,7 @@
     </header>
 
     <noscript>GolfTrainer needs JavaScript to record a round.</noscript>
-    <ul id="status"></ul>
+    <main id="view" class="screen"></main>
 
     <script type="module" src="src/main.js"></script>
   </body>

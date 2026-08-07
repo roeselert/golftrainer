@@ -9,16 +9,21 @@ store. The architecture, the decisions behind it and the open questions live in
 
 ## Status
 
-Bootstrap. The walking skeleton proves the stack holds — offline cold start,
-local Postgres, storage durability — but no use case is implemented yet. All
-four are now specified in [`docs/use cases/`](<docs/use cases/README.md>);
-UC5, the course catalogue, is the one that has to be built first, because a
-round needs a course.
+All four use cases work. Add a course and capture a full round in airplane
+mode; review it on a map or plan one in advance when you are back online. The
+specifications they were built from are in
+[`docs/use cases/`](<docs/use cases/README.md>), and the acceptance criteria in
+them are what the tests are named after.
 
-The burger menu lists the four destinations. Three are disabled and say why;
-only **Load new version** works. It clears the cached app shell and reinstalls
-it, and it refuses to run offline — deleting the precache with no network would
-leave nothing to reinstall from. Rounds live in IndexedDB and are never touched.
+Not yet verified by a human: whether the aerial imagery is any good on a real
+course. That is OPEN-10 in `CLAUDE.md`, and it needs a browser, not a decision.
+
+The burger menu lists five destinations. **Track round** and **Manage courses**
+work with no network at all; **Show round** and **Plan round** need one and say
+so before you tap them, because they are online capabilities and are not
+precached. **Load new version** clears the cached app shell and reinstalls it,
+and refuses to run offline — deleting the precache with no network would leave
+nothing to reinstall from. Rounds live in IndexedDB and are never touched.
 
 ## Running it
 
@@ -73,8 +78,8 @@ build from publishing a broken app.
 ## Tests
 
 ```sh
-npm run test:unit       # migrations, precache manifest
-npm run test:e2e        # offline cold start in a real browser
+npm run test:unit       # domain rules, migrations, precache boundary
+npm run test:e2e        # a whole round captured offline, in a real browser
 npm run test:e2e:pages  # the same, mounted at /golftrainer/ as Pages serves it
 ```
 

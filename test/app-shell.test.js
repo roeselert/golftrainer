@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+
+import { jsModulesUnder, repoRoot } from '../tools/source-modules.mjs';
 
 /**
  * Guards QG1 against the quietest possible failure.
@@ -11,10 +13,11 @@ import test from 'node:test';
  * that list still works in development — the network serves it — and then fails
  * on the first tee, where there is no network and no way to diagnose it.
  *
- * This test is the thing that makes the hand-maintained list safe.
+ * The list has a second job now that the online half exists. It is not "every
+ * module"; it is "the offline shell". Precaching `src/online/` would drag a map
+ * library the golfer cannot use into the download they make before teeing off,
+ * so this file checks the boundary in both directions.
  */
-
-const repoRoot = path.resolve(import.meta.dirname, '..');
 
 /**
  * Root entries that must be cached for a cold start in airplane mode.
@@ -22,28 +25,17 @@ const repoRoot = path.resolve(import.meta.dirname, '..');
  */
 const requiredRootEntries = ['./', 'index.html', 'manifest.webmanifest', 'app-shell.json'];
 
-/**
- * @param {string} dir
- * @returns {Promise<string[]>} base-relative paths of every .js file below `dir`
- */
-async function jsModulesUnder(dir) {
-  const entries = await readdir(path.join(repoRoot, dir), {
-    withFileTypes: true,
-    recursive: true,
-  });
-
-  return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
-    .map((entry) => path.relative(repoRoot, path.join(entry.parentPath, entry.name)))
-    .map((relative) => relative.split(path.sep).join('/'));
+/** @returns {Promise<string[]>} */
+async function shellManifest() {
+  const manifest = JSON.parse(await readFile(path.join(repoRoot, 'app-shell.json'), 'utf8'));
+  return manifest.shell;
 }
 
-test('every source module is listed in the precache manifest', async () => {
-  const manifest = JSON.parse(await readFile(path.join(repoRoot, 'app-shell.json'), 'utf8'));
-  const listed = new Set(manifest.shell);
-  const onDisk = await jsModulesUnder('src');
+test('every offline module is listed in the precache manifest', async () => {
+  const listed = new Set(await shellManifest());
+  const onDisk = (await jsModulesUnder('src')).filter((url) => !url.startsWith('src/online/'));
 
-  const missing = onDisk.filter((/** @type {string} */ url) => !listed.has(url));
+  const missing = onDisk.filter((url) => !listed.has(url));
   assert.deepEqual(
     missing,
     [],
@@ -51,11 +43,22 @@ test('every source module is listed in the precache manifest', async () => {
   );
 });
 
+test('no online capability is precached', async () => {
+  const listed = await shellManifest();
+
+  const online = listed.filter((url) => url.startsWith('src/online/'));
+  assert.deepEqual(
+    online,
+    [],
+    `The precache is the offline shell (CLAUDE.md §1.4). These are online capabilities and must be loaded on navigation instead:\n  ${online.join('\n  ')}`,
+  );
+});
+
 test('the precache manifest lists no file that has been deleted', async () => {
-  const manifest = JSON.parse(await readFile(path.join(repoRoot, 'app-shell.json'), 'utf8'));
+  const listed = await shellManifest();
   const onDisk = new Set(await jsModulesUnder('src'));
 
-  const stale = manifest.shell
+  const stale = listed
     .filter((/** @type {string} */ url) => url.startsWith('src/'))
     .filter((/** @type {string} */ url) => !onDisk.has(url));
 
@@ -67,10 +70,67 @@ test('the precache manifest lists no file that has been deleted', async () => {
 });
 
 test('the precache manifest covers the app shell entry points', async () => {
-  const manifest = JSON.parse(await readFile(path.join(repoRoot, 'app-shell.json'), 'utf8'));
-  const listed = new Set(manifest.shell);
+  const listed = new Set(await shellManifest());
 
   for (const entry of requiredRootEntries) {
     assert.ok(listed.has(entry), `${entry} must be precached for a cold start with no network.`);
+  }
+});
+
+test('every icon the manifest names exists and is precached', async () => {
+  // The trap this closes has been sprung here once already: a manifest that
+  // named a file nobody deployed made the service worker's install fetch 404,
+  // and `addAll` is atomic, so *nothing* was cached. Icons are on the TD8 path
+  // — installability is a functional requirement — so they get the same guard.
+  const manifest = JSON.parse(await readFile(path.join(repoRoot, 'manifest.webmanifest'), 'utf8'));
+  const listed = new Set(await shellManifest());
+
+  assert.ok(manifest.icons.length > 0, 'An installable PWA needs icons (TD8).');
+
+  for (const icon of manifest.icons) {
+    await stat(path.join(repoRoot, icon.src));
+    assert.ok(listed.has(icon.src), `${icon.src} is in the manifest but is not precached.`);
+  }
+
+  // Chrome's install criteria name these two sizes specifically.
+  const sizes = new Set(manifest.icons.map((/** @type {any} */ icon) => icon.sizes));
+  for (const required of ['192x192', '512x512']) {
+    assert.ok(sizes.has(required), `A ${required} icon is required for installability.`);
+  }
+
+  // Android may crop to a circle; without this the flag loses its top.
+  assert.ok(
+    manifest.icons.some((/** @type {any} */ icon) => icon.purpose?.includes('maskable')),
+    'One icon must be declared maskable.',
+  );
+});
+
+test('iOS gets a raster touch icon, because it never reads the manifest', async () => {
+  const html = await readFile(path.join(repoRoot, 'index.html'), 'utf8');
+  const match = html.match(/<link rel="apple-touch-icon" href="([^"]+)"/);
+
+  assert.ok(match, 'index.html must declare an apple-touch-icon: iOS ignores the manifest.');
+  const href = match[1] ?? '';
+  assert.ok(href.endsWith('.png'), `apple-touch-icon must be raster, got ${href}.`);
+  await stat(path.join(repoRoot, href));
+
+  const listed = new Set(await shellManifest());
+  assert.ok(listed.has(href), `${href} is referenced by index.html but is not precached.`);
+});
+
+test('the offline core imports nothing from the online half', async () => {
+  // ESLint enforces this too (TD10). Checking it here as well costs nothing and
+  // catches the case where someone relaxes the lint rule rather than the code.
+  const offline = (await jsModulesUnder('src')).filter(
+    (url) => url.startsWith('src/offline/') || url.startsWith('src/shell/'),
+  );
+
+  for (const relative of offline) {
+    const source = await readFile(path.join(repoRoot, relative), 'utf8');
+    const importsOnline = /^\s*import\s[^;]*['"][^'"]*\/online\//m.test(source);
+    assert.ok(
+      !importsOnline,
+      `${relative} statically imports an online capability. Dependencies point one way only (CLAUDE.md §1.4).`,
+    );
   }
 });
