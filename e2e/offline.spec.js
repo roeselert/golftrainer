@@ -80,3 +80,43 @@ test('the database survives being closed and reopened', async ({ page, context }
 
   expect(rows).toEqual([{ note: 'round in progress' }]);
 });
+
+test('the icons the home screen uses are real images, and survive going offline', async ({
+  page,
+  context,
+}) => {
+  await page.goto('index.html');
+  await waitForServiceWorkerControl(page);
+
+  // Installing to the home screen is a functional requirement (TD8), so a
+  // corrupt or missing icon is a broken install rather than a cosmetic slip.
+  // Every check before this one reads the file system; this one decodes.
+  await context.setOffline(true);
+
+  const decoded = await page.evaluate(async () => {
+    const sources = [
+      'icons/icon-180.png',
+      'icons/icon-192.png',
+      'icons/icon-512.png',
+      'icons/icon.svg',
+    ];
+
+    return Promise.all(
+      sources.map(
+        (src) =>
+          new Promise((resolve) => {
+            const image = new Image();
+            image.onload = () => resolve({ src, width: image.naturalWidth });
+            image.onerror = () => resolve({ src, width: 0 });
+            image.src = src;
+          }),
+      ),
+    );
+  });
+
+  for (const image of decoded) {
+    expect(image.width, `${image.src} did not decode`).toBeGreaterThan(0);
+  }
+
+  await context.setOffline(false);
+});

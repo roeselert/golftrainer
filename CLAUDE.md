@@ -293,7 +293,10 @@ apply to us:
 **Consequences for the build — both are functional requirements, not polish:**
 
 - Installation is part of onboarding, not an optional prompt. A round captured
-  in a *browser tab* is the case the seven-day rule still governs.
+  in a *browser tab* is the case the seven-day rule still governs. This is also
+  why the icons are a functional requirement rather than decoration: Chrome will
+  not offer to install without a 192 and a 512, and iOS ignores the manifest
+  entirely and reads `apple-touch-icon`. No icon, no home screen, no carve-out.
 - Call `navigator.storage.persist()` at first run and check `persisted()`. If
   persistence is refused, say so plainly rather than pretending the round is safe.
 
@@ -317,6 +320,7 @@ index.html              app shell
 sw.js                   service worker — precaches shell + PGlite (TD4)
 app-shell.json          precache list; verified against disk by a test
 manifest.webmanifest    installability, which TD8 depends on
+icons/                  icon.svg is the source; the PNGs are `npm run icons`
 
 src/
   main.js               composition root; routes, menu, boot order

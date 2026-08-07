@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -75,6 +75,47 @@ test('the precache manifest covers the app shell entry points', async () => {
   for (const entry of requiredRootEntries) {
     assert.ok(listed.has(entry), `${entry} must be precached for a cold start with no network.`);
   }
+});
+
+test('every icon the manifest names exists and is precached', async () => {
+  // The trap this closes has been sprung here once already: a manifest that
+  // named a file nobody deployed made the service worker's install fetch 404,
+  // and `addAll` is atomic, so *nothing* was cached. Icons are on the TD8 path
+  // — installability is a functional requirement — so they get the same guard.
+  const manifest = JSON.parse(await readFile(path.join(repoRoot, 'manifest.webmanifest'), 'utf8'));
+  const listed = new Set(await shellManifest());
+
+  assert.ok(manifest.icons.length > 0, 'An installable PWA needs icons (TD8).');
+
+  for (const icon of manifest.icons) {
+    await stat(path.join(repoRoot, icon.src));
+    assert.ok(listed.has(icon.src), `${icon.src} is in the manifest but is not precached.`);
+  }
+
+  // Chrome's install criteria name these two sizes specifically.
+  const sizes = new Set(manifest.icons.map((/** @type {any} */ icon) => icon.sizes));
+  for (const required of ['192x192', '512x512']) {
+    assert.ok(sizes.has(required), `A ${required} icon is required for installability.`);
+  }
+
+  // Android may crop to a circle; without this the flag loses its top.
+  assert.ok(
+    manifest.icons.some((/** @type {any} */ icon) => icon.purpose?.includes('maskable')),
+    'One icon must be declared maskable.',
+  );
+});
+
+test('iOS gets a raster touch icon, because it never reads the manifest', async () => {
+  const html = await readFile(path.join(repoRoot, 'index.html'), 'utf8');
+  const match = html.match(/<link rel="apple-touch-icon" href="([^"]+)"/);
+
+  assert.ok(match, 'index.html must declare an apple-touch-icon: iOS ignores the manifest.');
+  const href = match[1] ?? '';
+  assert.ok(href.endsWith('.png'), `apple-touch-icon must be raster, got ${href}.`);
+  await stat(path.join(repoRoot, href));
+
+  const listed = new Set(await shellManifest());
+  assert.ok(listed.has(href), `${href} is referenced by index.html but is not precached.`);
 });
 
 test('the offline core imports nothing from the online half', async () => {

@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "vendor": "node tools/vendor-pglite.mjs && node tools/vendor-leaflet.mjs",
+    "icons": "node tools/make-icons.mjs",
     "postinstall": "node tools/vendor-pglite.mjs && node tools/vendor-leaflet.mjs",
     "start": "node tools/serve.mjs",
     "lint": "eslint .",
