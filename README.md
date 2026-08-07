@@ -10,8 +10,10 @@ store. The architecture, the decisions behind it and the open questions live in
 ## Status
 
 Bootstrap. The walking skeleton proves the stack holds — offline cold start,
-local Postgres, storage durability — but no use case is implemented yet. The
-capture screen (UC1) waits on OPEN-3 in `CLAUDE.md`.
+local Postgres, storage durability — but no use case is implemented yet. All
+four are now specified in [`docs/use cases/`](<docs/use cases/README.md>);
+UC5, the course catalogue, is the one that has to be built first, because a
+round needs a course.
 
 The burger menu lists the four destinations. Three are disabled and say why;
 only **Load new version** works. It clears the cached app shell and reinstalls

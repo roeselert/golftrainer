@@ -8,10 +8,13 @@
  *   - Versions are strictly ascending integers with no gaps reused.
  *   - A migration is applied in a transaction with its version bump.
  *
- * Deliberately empty. The domain tables (rounds, holes, strokes, positions)
- * wait on OPEN-3 in CLAUDE.md — how a stroke is actually recorded — which is
- * settled in the UC1 use-case spec, not guessed at here. The runner and its
- * tests exist now so the first real migration has somewhere safe to land.
+ * Deliberately empty. The domain tables (courses, rounds, holes, strokes) are
+ * now specified — `docs/use cases/README.md` holds the shared model — and the
+ * first migration lands with UC5, the course catalogue, because nothing else
+ * works without a course. It waits on OPEN-8: `club` is a column on every
+ * stroke, and an enumeration is not a thing to guess at before the first
+ * migration ships. The runner and its tests exist so it has somewhere safe to
+ * land.
  *
  * @type {readonly import('../migrations.js').Migration[]}
  */
