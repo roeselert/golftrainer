@@ -122,13 +122,14 @@ The `RoundHole` survives; its strokes do not.
 
 ## 4. Exception flows
 
-| #   | Condition                                                            | System response                                                                                                                                                          |
-| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| E1  | The device is offline                                                | The planner refuses to open and says why: it needs the map, and the map is online only. It does not open a mapless degraded mode — that is car mode, and car mode is UC1 |
-| E2  | The connection drops mid-plan                                        | Strokes already placed are saved; the store is local, so nothing is lost. Tiles stop loading and the system says so rather than showing empty grey squares               |
-| E3  | The tile provider fails or rate-limits                               | Reported plainly. The plan is not corrupted by the absence of a basemap                                                                                                  |
-| E4  | The golfer taps a spot implausibly far from the tee (more than 1 km) | Accepted, but flagged. A mis-tap on a zoomed-out map is easy and expensive to notice later                                                                               |
-| E5  | The store write fails                                                | The stroke is reported as not placed and is not drawn. The map never shows a stroke the store does not have                                                              |
+| #   | Condition                                                            | System response                                                                                                                                                                 |
+| --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E1  | The device is offline                                                | The planner refuses to open and says why: it needs the map, and the map is online only. It does not open a mapless degraded mode — that is car mode, and car mode is UC1        |
+| E2  | The connection drops mid-plan                                        | Strokes already placed are saved; the store is local, so nothing is lost. Tiles stop loading and the system says so rather than showing empty grey squares                      |
+| E3  | The tile provider fails or rate-limits                               | Reported plainly. The plan is not corrupted by the absence of a basemap                                                                                                         |
+| E4  | The golfer taps a spot implausibly far from the tee (more than 1 km) | Accepted, but flagged. A mis-tap on a zoomed-out map is easy and expensive to notice later                                                                                      |
+| E5  | The store write fails                                                | The stroke is reported as not placed and is not drawn. The map never shows a stroke the store does not have                                                                     |
+| E6  | The course lies outside the orthophoto coverage                      | The map falls back to OSM standard tiles and says so. Planning on a street map is worse but not impossible; pretending the imagery is still loading would be worse still (TD7a) |
 
 ## 5. Business rules
 
@@ -140,7 +141,7 @@ The `RoundHole` survives; its strokes do not.
 | BR4 | A course may have any number of plans. A plan is not a property of a course                                                                                                                                                                        |
 | BR5 | Planned putts are an intention, stored in the same field as recorded putts                                                                                                                                                                         |
 | BR6 | The planner may read and write the offline core's domain model. The offline core may not know the planner exists — no import, no event, no shared type carrying a map concern (§1.4, enforced by TD10)                                             |
-| BR7 | Basemap attribution is visible wherever tiles are shown (§1.2)                                                                                                                                                                                     |
+| BR7 | Basemap attribution is visible wherever tiles are shown, naming the layer actually drawn. The imagery is CC BY 4.0, so this is a licence obligation and not a courtesy (TD7a)                                                                      |
 | BR8 | The club picker offers the same twelve clubs as the capture grid (UC1 BR11), from the same enumeration. It need not use the same layout — there is no glove and no group waiting here                                                              |
 | BR9 | A plan contains no penalty strokes. A penalty is a second stroke at the same position (UC1 A6), which is a thing that happens, not a thing anyone intends. Nothing forbids placing two strokes on one spot; it is simply never the point of a plan |
 
@@ -191,7 +192,8 @@ _then_ both pass.
 
 ## 8. Open questions
 
-- **OPEN-7** — the basemap. Satellite imagery is the obviously useful thing for
-  a golf hole, and is also the licensing question (§1.2).
+- Placing a stroke needs a tap accurate to a few metres on imagery zoomed to a
+  fairway. Whether that is comfortable on a phone, or whether planning is
+  effectively a larger-screen activity, is a thing to find out by using it.
 - Does a plan target a specific date or upcoming round, or is it just "a plan
   for this course"? The model says the latter. UC4 may want the former.
