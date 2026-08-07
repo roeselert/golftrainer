@@ -1,0 +1,15 @@
+node_modules/
+
+# PGlite runtime, reproduced by `npm run vendor` from the version pinned in
+# package-lock.json. Deliberately not committed: it is 17 MB of binary WASM per
+# version, and committing it would grow the repository permanently on every
+# upgrade. The requirement in CLAUDE.md TD9 is that these files are served from
+# our own origin and precached — not that they live in git history.
+vendor/
+
+# Tool output
+coverage/
+report/
+test-results/
+playwright-report/
+.jscpd/

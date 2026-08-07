@@ -1,0 +1,11 @@
+node_modules/
+vendor/
+
+# Installed skills — vendored content, not ours to reformat.
+.claude/
+coverage/
+report/
+test-results/
+playwright-report/
+package-lock.json
+CLAUDE.md

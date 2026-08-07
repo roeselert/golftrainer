@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    // Node typings cover the tooling and tests. ESLint is what keeps Node
+    // globals out of browser code (see the per-directory globals in
+    // eslint.config.mjs) — tsc is not asked to police that boundary.
+    "types": ["node"],
+    "skipLibCheck": true,
+    // `checkJs` would otherwise follow type-only references into dependencies
+    // and report their errors as ours.
+    "maxNodeModuleJsDepth": 0,
+
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "include": ["src/**/*.js", "tools/**/*.mjs", "test/**/*.js", "sw.js"],
+  "exclude": ["node_modules", "vendor"]
+}

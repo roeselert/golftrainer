@@ -1,0 +1,12 @@
+{
+  "name": "GolfTrainer",
+  "short_name": "GolfTrainer",
+  "description": "Record every stroke of a round on the course, then replay and simulate it on a map.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#10231a",
+  "theme_color": "#1b4332",
+  "icons": []
+}
