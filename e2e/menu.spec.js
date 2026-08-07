@@ -75,11 +75,25 @@ test('loading a new version reinstalls the app and keeps the round', async ({ pa
     await db.query('INSERT INTO update_probe (note) VALUES ($1)', ['round in progress']);
   });
 
+  // Stamp the current document so the reload can be detected. Waiting on the
+  // service worker alone is not enough: the page being replaced is still
+  // controlled by its own worker, so the controller check passes instantly and
+  // everything after it races the navigation.
+  await page.evaluate(() => {
+    Object.assign(window, { __documentBeforeUpdate: true });
+  });
+
   await page.locator('#menu-toggle').click();
   await page.locator('[data-action="load-new-version"]').click();
 
-  // The reload re-registers the worker and precaches from scratch.
+  // The reload replaces the document, then re-registers the worker and
+  // precaches from scratch. Both have to finish before anything is asserted.
+  await page.waitForFunction(() => !('__documentBeforeUpdate' in window), null, {
+    timeout: 90_000,
+  });
+  await page.waitForLoadState('load');
   await waitForServiceWorkerControl(page);
+
   await expect(page.locator('.status--fail')).toHaveCount(0);
   await expect(page.locator('#status')).toContainText('PostgreSQL');
 
