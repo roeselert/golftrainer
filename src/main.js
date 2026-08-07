@@ -15,6 +15,8 @@
 import { ensureDurableStorage } from './offline/shared/durability/storage-durability.js';
 import { closeDatabase, openDatabase } from './offline/shared/store/database.js';
 import { currentVersion } from './offline/shared/store/migrations.js';
+import { browserEnvironment, loadNewVersion } from './shell/app-update.js';
+import { createMenu } from './shell/menu.js';
 
 /**
  * @param {unknown} error
@@ -85,7 +87,30 @@ async function reportDatabase() {
   }
 }
 
+function wireMenu() {
+  const toggle = document.querySelector('#menu-toggle');
+  const panel = document.querySelector('#menu');
+  if (!(toggle instanceof HTMLElement) || !(panel instanceof HTMLElement)) return;
+
+  createMenu({
+    toggle,
+    panel,
+    handlers: {
+      // Only this one is implemented. Track round, plan round and manage
+      // courses are disabled in the markup until their use cases exist —
+      // a handler that did nothing would be worse than a disabled button.
+      'load-new-version': async () => {
+        const outcome = await loadNewVersion(browserEnvironment());
+        if (outcome.status !== 'reloading') {
+          report('Load new version', 'warn', outcome.message);
+        }
+      },
+    },
+  });
+}
+
 async function main() {
+  wireMenu();
   await registerServiceWorker();
   await reportStorage();
   await reportDatabase();

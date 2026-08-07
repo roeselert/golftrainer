@@ -13,6 +13,11 @@ Bootstrap. The walking skeleton proves the stack holds — offline cold start,
 local Postgres, storage durability — but no use case is implemented yet. The
 capture screen (UC1) waits on OPEN-3 in `CLAUDE.md`.
 
+The burger menu lists the four destinations. Three are disabled and say why;
+only **Load new version** works. It clears the cached app shell and reinstalls
+it, and it refuses to run offline — deleting the precache with no network would
+leave nothing to reinstall from. Rounds live in IndexedDB and are never touched.
+
 ## Running it
 
 ```sh
