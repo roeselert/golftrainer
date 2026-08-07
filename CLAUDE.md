@@ -89,6 +89,7 @@ flowchart TB
     gnss["GNSS / GPS<br/><i>device location services</i>"]
     tiles["Map tile provider<br/><i>online only</i>"]
     storage[("Device storage<br/><i>on-device, offline</i>")]
+    host["GitHub Pages<br/><i>static host — install & update only</i>"]
 
     golfer -->|"marks strokes, plans holes"| app
     app -->|"round on a map, planned strokes"| golfer
@@ -97,15 +98,23 @@ flowchart TB
     app <-->|"read/write rounds & plans"| storage
     app -->|"tile requests (online only)"| tiles
     tiles -->|"map tiles / imagery"| app
+    host -.->|"app shell + PGlite, once"| app
 
     classDef offline fill:#e8f5e9,stroke:#2e7d32
     classDef online fill:#fff3e0,stroke:#ef6c00
     class gnss,storage offline
-    class tiles online
+    class tiles,host online
 ```
 
 Green = works offline and is on the QG1 critical path. Orange = online only; the
 system must degrade cleanly without it.
+
+The host is dashed because it is reached **before** the round, never during one:
+it delivers the app and its updates, and after the service worker has installed
+(TD4) the app owes it nothing. A round captured while the host is unreachable is
+a round captured normally. Its one hard requirement is HTTPS — service workers
+and the Geolocation API both demand a secure context, so QG1 and UC1 rest on it
+(TD11).
 
 ---
 
@@ -191,6 +200,8 @@ sourcing preference.
 | TD7 | Basemap / tiles | **[OPEN-7]** | — | Couch-only, so it does not affect QG1. Deferred until UC2/UC3 are built |
 | TD9 | PGlite delivery | **Served from our own origin and precached; reproduced into `vendor/` by `npm run vendor`, not committed** | CDN import at runtime (jsDelivr); committing `vendor/` to git | A CDN fetch on the offline critical path would breach the dependency rule in §1.4 — the WASM must be on the device before the first tee. It is *generated* rather than committed because it is 17 MB of binary per version, and git history cannot shed it on the next upgrade |
 | TD10 | Enforcing the dependency rule | **ESLint, failing the build** | Convention and review; a custom dependency-graph checker | An architecture rule that only lives in prose erodes. `no-restricted-imports` blocks imports from `src/online/` into `src/offline/`, and `no-restricted-globals` blocks `fetch`/`XMLHttpRequest`/`WebSocket`/`EventSource` there — so the offline core cannot quietly grow a network call either |
+| TD11 | Hosting | **GitHub Pages**, deployed from CI on the default branch | A VPS; Netlify/Vercel; Cloudflare Pages | Static hosting over HTTPS is all a PWA needs — no server, no runtime, nothing to operate. HTTPS is not optional: service workers and the Geolocation API both require a secure context, so QG1 and UC1 depend on it |
+| TD12 | Path resolution | **Every path relative, none rooted at `/`** | A hard-coded base path; a custom domain at the root | GitHub Pages serves a project repository under `/<repo>/`. An absolute path resolves outside the app there — including the service worker scope and the PGlite WASM. Relative paths work at any mount point, so the app is not coupled to where it is published |
 
 ### Consequences of TD5 (PGlite)
 
@@ -284,12 +295,28 @@ run in CI on every push. `npm run signals` runs the lot locally.
 | 2.2.5 | Vulnerable dependencies | `npm audit` | Trivially small surface: one runtime dependency |
 | 2.2.6 | **Architecture conformance** | ESLint (TD10) | The dependency rule of §1.4, enforced rather than reviewed |
 | 2.2.7 | **Offline capability** | Playwright | QG1 verified in a real browser: load, cut the network, close the page, reopen it |
+| 2.2.8 | **Deployment shape** | Playwright | The same offline suite against the assembled site mounted at `/golftrainer/`, the layout GitHub Pages actually serves (TD12) |
 
-Signals 2.2.6 and 2.2.7 are additions to the standard set, and they are the two
-that matter most here — they are the only ones that check the claims the whole
-architecture rests on.
+Signals 2.2.6, 2.2.7 and 2.2.8 are additions to the standard set, and they are
+the ones that matter most here — they are the only ones that check the claims
+the whole architecture rests on.
 
-### 2.3 Two traps this bootstrap closes
+### 2.3 Deployment
+
+```
+npm run site   →  _site/   →  GitHub Pages
+```
+
+`tools/build-site.mjs` copies exactly the files the two precache manifests
+name, plus `sw.js` and the vendor manifest. Nothing is compiled or bundled, so
+TD2 still holds: what is served is what is in the repository.
+
+Deriving the deployment from the precache list keeps one list honest instead of
+two. A file that is not precached does not work on the course, so publishing it
+would be pointless — and a file that is precached but not published breaks the
+service worker's install outright.
+
+### 2.4 Three traps this bootstrap closes
 
 Both are silent failures: they look fine in development and break on the course.
 
@@ -303,6 +330,11 @@ Both are silent failures: they look fine in development and break on the course.
   intercepts nothing. Offline tests must wait on
   `navigator.serviceWorker.controller`, or they fail for reasons unrelated to
   being offline.
+- **A manifest that does not list itself.** `vendor/pglite/assets.json` names
+  every PGlite file but not itself, so the first deployment omitted it, the
+  service worker's install fetch 404'd, and *nothing* was cached. The app was
+  fine at the root and broken under a subpath. Signal 2.2.8 caught it; both
+  manifests are now precached and deployed.
 
 ---
 

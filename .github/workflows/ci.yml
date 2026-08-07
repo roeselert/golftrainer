@@ -9,6 +9,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   signals:
     name: Quality signals
@@ -67,9 +70,58 @@ jobs:
       - name: Offline end-to-end tests
         run: npm run test:e2e
 
+      # The same suite against the assembled site mounted at /golftrainer/,
+      # which is how GitHub Pages serves a project repository. Anything the app
+      # resolves from "/" would land outside itself there, so this is what stops
+      # a green build from deploying a broken app.
+      - name: Offline end-to-end tests (GitHub Pages layout)
+        run: npm run test:e2e:pages
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-traces
           path: test-results/
           retention-days: 7
+
+  deploy:
+    name: Deploy to GitHub Pages
+    # Only from the default branch, and only once the signals and both offline
+    # suites are green. A deployment that skipped them could publish an app that
+    # fails exactly where it matters — on a course, with no network.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [signals, test]
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Vendors PGlite via postinstall; the site is assembled from it.
+      - run: npm ci
+
+      # Copies exactly the files the two precache manifests name. Nothing is
+      # compiled or bundled — TD2 still holds.
+      - name: Assemble site
+        run: npm run site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

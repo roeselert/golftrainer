@@ -48,11 +48,27 @@ Each answers a question that reading the code cannot. All run in CI.
 | `npm audit`            | Vulnerable deps     | npm                               |
 | `npm run signals`      | All of the above    | —                                 |
 
+## Deployment
+
+CI publishes to GitHub Pages from `main`, after every signal and both offline
+suites pass.
+
+```sh
+npm run site    # assemble _site/ — a copy, not a build
+```
+
+The app uses **only relative paths**. GitHub Pages serves a project repository
+under `/<repo>/`, so anything rooted at `/` would resolve outside the app —
+including the service worker scope and the PGlite WASM. `npm run test:e2e:pages`
+runs the offline suite against that exact layout, which is what stops a green
+build from publishing a broken app.
+
 ## Tests
 
 ```sh
-npm run test:unit   # migrations, precache manifest
-npm run test:e2e    # offline cold start in a real browser
+npm run test:unit       # migrations, precache manifest
+npm run test:e2e        # offline cold start in a real browser
+npm run test:e2e:pages  # the same, mounted at /golftrainer/ as Pages serves it
 ```
 
 The end-to-end suite is the only thing that can verify the offline goal: it

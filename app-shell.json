@@ -1,13 +1,13 @@
 {
   "shell": [
-    "/",
-    "/index.html",
-    "/manifest.webmanifest",
-    "/app-shell.json",
-    "/src/main.js",
-    "/src/offline/shared/durability/storage-durability.js",
-    "/src/offline/shared/store/database.js",
-    "/src/offline/shared/store/migrations.js",
-    "/src/offline/shared/store/migrations/index.js"
+    "./",
+    "index.html",
+    "manifest.webmanifest",
+    "app-shell.json",
+    "src/main.js",
+    "src/offline/shared/durability/storage-durability.js",
+    "src/offline/shared/store/database.js",
+    "src/offline/shared/store/migrations.js",
+    "src/offline/shared/store/migrations/index.js"
   ]
 }

@@ -24,7 +24,9 @@ const repoRoot = path.resolve(import.meta.dirname, '..');
 const sourceDir = path.dirname(require.resolve('@electric-sql/pglite'));
 const pgliteRoot = path.dirname(sourceDir);
 const targetDir = path.join(repoRoot, 'vendor', 'pglite');
-const publicPrefix = '/vendor/pglite';
+// Relative, not rooted: the app is served from a subpath on GitHub Pages, and
+// the service worker resolves these against its own location.
+const publicPrefix = 'vendor/pglite';
 
 /** Files PGlite needs in a browser using the `idb://` filesystem. */
 const required = ['pglite.wasm', 'pglite.data', 'initdb.wasm'];

@@ -25,30 +25,45 @@ const worker = /** @type {any} */ (self);
 const CACHE_NAME = 'golftrainer-v1';
 
 /**
- * @param {string} url
- * @returns {Promise<string[]>}
+ * Where the app is mounted — `https://host/` locally, `https://host/golftrainer/`
+ * on GitHub Pages. Derived from the worker's own URL, so nothing here needs to
+ * know the deployment path, and both manifests can hold relative entries.
  */
-async function readUrlList(url) {
+const BASE = new URL('./', worker.location.href);
+
+/**
+ * @param {string} relativeUrl
+ * @returns {Promise<string[]>} entries resolved against BASE
+ */
+async function readUrlList(relativeUrl) {
+  const url = new URL(relativeUrl, BASE).href;
   const response = await fetch(url, { cache: 'no-cache' });
   if (!response.ok) {
     throw new Error(`Precache manifest ${url} is unavailable (HTTP ${response.status}).`);
   }
   const body = await response.json();
-  return body.shell ?? body.assets ?? [];
+  const entries = body.shell ?? body.assets ?? [];
+  return entries.map((/** @type {string} */ entry) => new URL(entry, BASE).href);
 }
 
+/**
+ * The manifests themselves. Cached alongside what they list, so that
+ * reinstalling the worker with no network still finds them — a manifest that
+ * is only reachable online would make a cold reinstall on the course fail.
+ * `app-shell.json` also appears in its own shell list; the cache dedupes.
+ */
+const MANIFESTS = ['app-shell.json', 'vendor/pglite/assets.json'];
+
 async function precache() {
-  const [shell, pglite] = await Promise.all([
-    readUrlList('/app-shell.json'),
-    readUrlList('/vendor/pglite/assets.json'),
-  ]);
+  const listed = await Promise.all(MANIFESTS.map((name) => readUrlList(name)));
+  const manifests = MANIFESTS.map((name) => new URL(name, BASE).href);
 
   const cache = await caches.open(CACHE_NAME);
 
   // addAll is atomic: one missing file fails the whole install, which is what
   // we want. A partially cached shell is worse than an obvious failure — it
   // would look installed and then break on the course.
-  await cache.addAll([...shell, ...pglite]);
+  await cache.addAll([...new Set([...manifests, ...listed.flat()])]);
 }
 
 worker.addEventListener('install', (event) => {
@@ -86,7 +101,7 @@ worker.addEventListener('fetch', (event) => {
       } catch {
         // Navigations must still resolve offline, even for an unknown path.
         if (request.mode === 'navigate') {
-          const shell = await caches.match('/index.html');
+          const shell = await caches.match(new URL('index.html', BASE).href);
           if (shell) return shell;
         }
         throw new Error(`Offline and ${request.url} is not precached.`);

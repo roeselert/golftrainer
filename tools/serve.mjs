@@ -14,6 +14,17 @@ import { pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 
+/**
+ * What to serve, and where to mount it.
+ *
+ * `SITE_ROOT` / `BASE_PATH` exist so the end-to-end suite can reproduce the
+ * GitHub Pages layout, where the app lives under /<repo>/ rather than at the
+ * root. That difference has broken the app once already; being able to test it
+ * locally is the point.
+ */
+const documentRoot = path.resolve(repoRoot, process.env.SITE_ROOT ?? '.');
+const basePath = `/${(process.env.BASE_PATH ?? '/').replace(/^\/+|\/+$/g, '')}`.replace(/\/$/, '');
+
 /** @type {Record<string, string>} */
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -38,11 +49,19 @@ const contentTypes = {
  */
 async function resolveFile(urlPath) {
   const decoded = decodeURIComponent(urlPath.split('?')[0] ?? '/');
-  const relative = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '');
-  const candidate = path.resolve(repoRoot, relative);
+
+  // Strip the mount point. Anything outside it is not ours to serve, which is
+  // exactly how GitHub Pages treats requests outside /<repo>/.
+  if (basePath !== '' && !decoded.startsWith(`${basePath}/`) && decoded !== basePath) {
+    return null;
+  }
+  const withinSite = decoded.slice(basePath.length) || '/';
+
+  const relative = withinSite === '/' ? 'index.html' : withinSite.replace(/^\/+/, '');
+  const candidate = path.resolve(documentRoot, relative);
 
   // Path traversal guard: a static host would not serve outside its root.
-  if (candidate !== repoRoot && !candidate.startsWith(repoRoot + path.sep)) {
+  if (candidate !== documentRoot && !candidate.startsWith(documentRoot + path.sep)) {
     return null;
   }
 
@@ -97,5 +116,5 @@ if (invokedDirectly) {
   const server = await startServer(port);
   const address = server.address();
   const shown = typeof address === 'object' && address !== null ? address.port : port;
-  console.log(`GolfTrainer served from ${repoRoot} at http://127.0.0.1:${shown}`);
+  console.log(`GolfTrainer served from ${documentRoot} at http://127.0.0.1:${shown}${basePath}/`);
 }

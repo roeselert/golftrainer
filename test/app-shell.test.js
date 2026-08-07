@@ -16,12 +16,15 @@ import test from 'node:test';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 
-/** Root files that must be cached for a cold start in airplane mode. */
-const requiredRootEntries = ['/', '/index.html', '/manifest.webmanifest', '/app-shell.json'];
+/**
+ * Root entries that must be cached for a cold start in airplane mode.
+ * Relative, because the app is served from a subpath on GitHub Pages.
+ */
+const requiredRootEntries = ['./', 'index.html', 'manifest.webmanifest', 'app-shell.json'];
 
 /**
  * @param {string} dir
- * @returns {Promise<string[]>} public URLs of every .js file below `dir`
+ * @returns {Promise<string[]>} base-relative paths of every .js file below `dir`
  */
 async function jsModulesUnder(dir) {
   const entries = await readdir(path.join(repoRoot, dir), {
@@ -32,7 +35,7 @@ async function jsModulesUnder(dir) {
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
     .map((entry) => path.relative(repoRoot, path.join(entry.parentPath, entry.name)))
-    .map((relative) => `/${relative.split(path.sep).join('/')}`);
+    .map((relative) => relative.split(path.sep).join('/'));
 }
 
 test('every source module is listed in the precache manifest', async () => {
@@ -53,7 +56,7 @@ test('the precache manifest lists no file that has been deleted', async () => {
   const onDisk = new Set(await jsModulesUnder('src'));
 
   const stale = manifest.shell
-    .filter((/** @type {string} */ url) => url.startsWith('/src/'))
+    .filter((/** @type {string} */ url) => url.startsWith('src/'))
     .filter((/** @type {string} */ url) => !onDisk.has(url));
 
   assert.deepEqual(

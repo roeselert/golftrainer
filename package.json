@@ -13,8 +13,10 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -p jsconfig.json",
     "duplication": "jscpd src tools test",
+    "site": "node tools/build-site.mjs",
     "test:unit": "node --test 'test/**/*.test.js'",
     "test:e2e": "playwright test",
+    "test:e2e:pages": "npm run site && playwright test -c playwright.pages.config.js",
     "test": "npm run test:unit",
     "signals": "npm run lint && npm run format:check && npm run typecheck && npm run duplication && npm audit --audit-level=high"
   },
