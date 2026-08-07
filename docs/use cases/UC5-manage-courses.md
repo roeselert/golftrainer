@@ -99,10 +99,13 @@ with no tee positions at all (step 5) and fills them in over the following
 rounds, one tee at a time. This is the expected path, not a fallback: requiring
 eighteen positions before the first round would mean walking the course twice.
 
-**A2 — Place a tee on the map.** From the couch, online, the golfer places or
-corrects a tee position on the map instead of standing on it. This is the same
-write, reached from UC3 A2. It is an online convenience over an offline
-capability, which is the dependency direction §1.4 requires.
+**A2 — Place the tees on a map.** From the couch, online, the golfer opens the
+course's tee map and taps each tee in turn; the selection advances to the next
+hole without one, so eighteen taps place eighteen tees. Placed markers can be
+dragged. This is the same `setTeePosition` write the on-course capture uses,
+reached from the catalogue screen by _navigating_ rather than importing — an
+online convenience over an offline capability, which is the dependency
+direction §1.4 requires. The planner reaches the same write from UC3 A2.
 
 **A3 — Correct a tee position.** Capturing again overwrites. There is no history
 of tee positions; a tee that moved was never two places.
@@ -127,15 +130,16 @@ BR3 and the open question below.
 
 ## 5. Business rules
 
-| #   | Rule                                                                                                                                                                 |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BR1 | Course data is entered by the golfer. There is no provider, no import and no network in this use case — that is the resolution of OPEN-4                             |
-| BR2 | A course is usable as soon as it has a name and a hole count. Tee positions are optional, always, and forever                                                        |
-| BR3 | A course has 9 or 18 holes, chosen with two large buttons rather than typed                                                                                          |
-| BR4 | Hole numbers are 1..`holeCount`, contiguous, and unique within a course. They are created with the course and never added or removed afterwards                      |
-| BR5 | A course cannot be deleted while a round references it                                                                                                               |
-| BR6 | Typing is acceptable here — a course name is typed once, on the couch or before the first tee. QG2's no-typing rule governs capture during play (UC1 BR2), not setup |
-| BR7 | This use case runs offline. The map-based variant A2 is an online addition that writes the same field, never a replacement                                           |
+| #   | Rule                                                                                                                                                                           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BR1 | Course data is entered by the golfer. There is no provider, no import and no network in this use case — that is the resolution of OPEN-4                                       |
+| BR2 | A course is usable as soon as it has a name and a hole count. Tee positions are optional, always, and forever                                                                  |
+| BR3 | A course has 9 or 18 holes, chosen with two large buttons rather than typed                                                                                                    |
+| BR4 | Hole numbers are 1..`holeCount`, contiguous, and unique within a course. They are created with the course and never added or removed afterwards                                |
+| BR5 | A course cannot be deleted while a round references it                                                                                                                         |
+| BR6 | Typing is acceptable here — a course name is typed once, on the couch or before the first tee. QG2's no-typing rule governs capture during play (UC1 BR2), not setup           |
+| BR7 | This use case runs offline. The map-based variant A2 is an online addition that writes the same field, never a replacement. Losing the network costs the map, never the course |
+| BR8 | A tee placed on a map has no accuracy, because nothing measured it. A capture from a fix keeps the accuracy the device reported                                                |
 
 ## 6. Data requirements
 

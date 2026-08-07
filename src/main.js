@@ -189,6 +189,14 @@ async function main() {
         requiresNetwork: true,
         load: () => import('./online/review/review-view.js'),
       },
+      // Placing tees on a map is the couch half of UC5. The catalogue screen
+      // navigates here rather than importing it, so the offline core still does
+      // not know this screen exists.
+      tees: {
+        name: 'Tee positions',
+        requiresNetwork: true,
+        load: () => import('./online/catalogue/tee-map-view.js'),
+      },
       plan: {
         name: 'Plan round',
         requiresNetwork: true,

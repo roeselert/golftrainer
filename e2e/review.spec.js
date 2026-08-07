@@ -79,7 +79,7 @@ test('UC2 AC1 — a captured round is shown as overview, table and map', async (
 
   // Map: built and attributed, whether or not a tile ever arrives.
   await expect(page.locator('#round-map')).toBeVisible();
-  await expect(page.locator('.attribution')).toContainText('CC BY 4.0');
+  await expect(page.locator('.attribution')).toContainText('Esri');
   await expect(page.locator('#round-map .leaflet-marker-icon').first()).toBeVisible();
 });
 

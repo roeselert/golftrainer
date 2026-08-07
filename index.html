@@ -21,6 +21,13 @@
       They are opaque by construction (tools/make-icons.mjs). iOS composites an
       alpha channel onto black, so a transparent corner is a black corner.
     -->
+    <!--
+      The bare link is not redundant. iOS versions that do not match on `sizes`
+      fall back to a link without it, and the ones that do match still find the
+      sized entries below. Both paths land on the 180, which is what an iPhone
+      wants.
+    -->
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
     <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
     <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
@@ -504,6 +511,37 @@
         justify-content: space-between;
         gap: 0.5rem;
         margin: 1rem 0;
+      }
+
+      /* The hole picker on the tee map: eighteen targets that still take a
+         gloved thumb, wrapped rather than scrolled so none is hidden. */
+      .hole-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        margin: 0.75rem 0;
+      }
+
+      .hole-chip {
+        min-width: 3rem;
+        min-height: 3rem;
+        background: var(--surface);
+        color: var(--muted);
+        border: 1px solid #2b5039;
+        border-radius: 0.625rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .hole-chip--set {
+        color: var(--text);
+        border-color: #3f7d5a;
+      }
+
+      .hole-chip--on {
+        background: #24503a;
+        color: var(--text);
+        outline: 2px solid var(--ok);
       }
 
       .notice {

@@ -224,11 +224,11 @@ async function renderHole(outlet, context, plan, number) {
         longitude: teeHole.teePosition.longitude,
       },
       zoom: 16,
+      onTrouble: (message) => messages.append(notice('warn', message)),
     });
     map = created.map;
     leaflet = created.leaflet;
     attribution.textContent = created.basemap.attribution;
-    if (created.basemap.note) messages.append(notice('info', created.basemap.note));
   } catch (error) {
     messages.append(notice('warn', `The map could not be loaded: ${describeError(error)}`));
     return;

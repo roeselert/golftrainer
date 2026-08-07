@@ -106,7 +106,7 @@ figures, the golfer jumps straight to that hole's map.
 | E4  | Offline                                             | The map cannot be drawn and says so. What happens to the overview and table is BR6                                                                                                                                                                                               |
 | E5  | The tile provider fails                             | Reported. The route is still drawn on whatever the map can render, because the geometry is local data                                                                                                                                                                            |
 | E6  | A hole was played with no strokes recorded (UC1 A5) | Shown as "not recorded", with its putts if there are any. Not as a zero                                                                                                                                                                                                          |
-| E7  | The course lies outside the orthophoto coverage     | The map falls back to OSM standard tiles and says that no imagery is available here. A silent fallback would read as a failed load, and the golfer would keep waiting for a photo that is never coming (TD7a)                                                                    |
+| E7  | The imagery service will not load tiles             | After a handful of failed tiles the system says so and points at the layer switcher, rather than leaving a grey rectangle that looks like a slow connection (TD7a)                                                                                                               |
 
 ## 5. Business rules
 

@@ -105,19 +105,31 @@ test('every icon the manifest names exists and is precached', async () => {
   );
 });
 
-test('iOS gets raster touch icons, because it never reads the manifest', async () => {
+/**
+ * Every `apple-touch-icon` link in index.html, with the size it declares.
+ *
+ * @returns {Promise<{ href: string, size: number | null }[]>}
+ */
+async function touchIconLinks() {
   const html = await readFile(path.join(repoRoot, 'index.html'), 'utf8');
-  const hrefs = [...html.matchAll(/<link rel="apple-touch-icon"[^>]*href="([^"]+)"/g)].map(
-    (match) => match[1] ?? '',
-  );
+  const tags = html.match(/<link[^>]*rel="apple-touch-icon"[^>]*>/g) ?? [];
 
+  return tags.map((tag) => {
+    const href = tag.match(/href="([^"]+)"/)?.[1] ?? '';
+    const sizes = tag.match(/sizes="(\d+)x\d+"/)?.[1];
+    return { href, size: sizes ? Number(sizes) : null };
+  });
+}
+
+test('iOS gets raster touch icons, because it never reads the manifest', async () => {
+  const links = await touchIconLinks();
   assert.ok(
-    hrefs.length > 0,
+    links.length > 0,
     'index.html must declare an apple-touch-icon: iOS ignores the manifest.',
   );
 
   const listed = new Set(await shellManifest());
-  for (const href of hrefs) {
+  for (const { href } of links) {
     assert.ok(href.endsWith('.png'), `apple-touch-icon must be raster, got ${href}.`);
     await stat(path.join(repoRoot, href));
     assert.ok(listed.has(href), `${href} is referenced by index.html but is not precached.`);
@@ -126,37 +138,38 @@ test('iOS gets raster touch icons, because it never reads the manifest', async (
   // 180 is the one an iPhone at @3x actually uses, and the phone is the device
   // UC1 is written for.
   assert.ok(
-    hrefs.some((href) => href.includes('180')),
+    links.some((link) => link.href.includes('180')),
     'iOS needs a 180x180 icon for an iPhone at @3x.',
+  );
+
+  // A link with no `sizes` at all, because iOS versions that do not match on it
+  // fall back to exactly that and would otherwise find nothing.
+  assert.ok(
+    links.some((link) => link.size === null),
+    'Declare one apple-touch-icon without a `sizes` attribute, as the fallback.',
   );
 });
 
-test('the touch icons carry no alpha channel', async () => {
+test('the touch icons carry no alpha channel, and are the size they claim', async () => {
   // Not a nicety. iOS composites any transparency in an apple-touch-icon onto
   // black, so a corner the artwork failed to cover becomes a black corner on
   // the home screen — and nothing else in this repository would notice.
-  const html = await readFile(path.join(repoRoot, 'index.html'), 'utf8');
-  const hrefs = [...html.matchAll(/<link rel="apple-touch-icon"[^>]*href="([^"]+)"/g)].map(
-    (match) => match[1] ?? '',
-  );
+  for (const link of await touchIconLinks()) {
+    const png = await readFile(path.join(repoRoot, link.href));
 
-  for (const href of hrefs) {
-    const png = await readFile(path.join(repoRoot, href));
-
-    assert.equal(png.subarray(1, 4).toString(), 'PNG', `${href} is not a PNG.`);
+    assert.equal(png.subarray(1, 4).toString(), 'PNG', `${link.href} is not a PNG.`);
     // IHDR: width at byte 16, colour type at byte 25. Types 4 and 6 carry alpha.
     const colourType = png[25];
     assert.ok(
       colourType === 0 || colourType === 2 || colourType === 3,
-      `${href} has an alpha channel (PNG colour type ${colourType}); iOS would composite it onto black.`,
+      `${link.href} has an alpha channel (PNG colour type ${colourType}); iOS would composite it onto black.`,
     );
 
-    const declared = html.match(new RegExp(`sizes="(\\d+)x\\1"[^>]*href="${href}"`));
-    if (declared) {
+    if (link.size !== null) {
       assert.equal(
         png.readUInt32BE(16),
-        Number(declared[1]),
-        `${href} is not the size index.html says it is.`,
+        link.size,
+        `${link.href} is not the size index.html says it is.`,
       );
     }
   }
