@@ -165,9 +165,15 @@ _then_ the stored round is byte-for-byte unchanged.
 
 **AC6 — Offline is stated, not faked**
 _Given_ the device is offline,
-_when_ the golfer opens the map view,
-_then_ the system says the map needs a network and does not render a blank
-canvas as if it were a course.
+_when_ the golfer opens Show round,
+_then_ the system says the screen needs a network and does not open a partial
+version of itself.
+
+> Refined during implementation. This use case lives in the online half (BR6),
+> so its modules are not precached and it cannot open offline at all — the
+> refusal happens at the door rather than at the map. Making the overview and
+> table reachable on the course would mean moving them into the offline core,
+> which is the decision BR6 declines to make.
 
 **AC7 — A penalty is visible as two strokes, not one**
 _Given_ a hole where strokes 2 and 3 were recorded at the same position (UC1

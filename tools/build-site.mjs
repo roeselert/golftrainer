@@ -2,21 +2,27 @@
  * Assembles the deployable site into `_site/`.
  *
  * Not a build step in the TD2 sense — nothing is transformed, compiled or
- * bundled. It is a copy, and what it copies is decided by the same two
- * manifests the service worker precaches from:
+ * bundled. It is a copy, and what it copies is decided by the manifests:
  *
- *   app-shell.json            the app shell
- *   vendor/pglite/assets.json the database engine
+ *   app-shell.json             the app shell        precached
+ *   vendor/pglite/assets.json  the database engine  precached
+ *   vendor/leaflet/assets.json the map library      deployed, never precached
+ *   src/online/**              the online screens   deployed, never precached
  *
- * Deriving the deployment from the precache list keeps one list honest instead
- * of two. A file that is not precached is a file that does not work on the
- * course, so publishing it would be pointless anyway.
+ * Deriving the deployment from the precache lists keeps them honest, and for
+ * the offline half the two questions have one answer: a file that is not
+ * precached does not work on the course, so publishing it would be pointless.
+ *
+ * The online half breaks that equivalence, and is the reason the last two lines
+ * exist. Those files must be *served* — the screens are loaded on navigation —
+ * but precaching them would put a map library into the download the golfer
+ * makes before teeing off, for screens that refuse to open without a network.
  */
 
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const repoRoot = path.resolve(import.meta.dirname, '..');
+import { jsModulesUnder, repoRoot } from './source-modules.mjs';
 const siteDir = path.join(repoRoot, '_site');
 
 /**
@@ -29,7 +35,21 @@ const siteDir = path.join(repoRoot, '_site');
  *                              service worker reads it during install, so
  *                              omitting it breaks the whole precache.
  */
-const extras = ['sw.js', 'vendor/pglite/assets.json'];
+const extras = ['sw.js', 'vendor/pglite/assets.json', 'vendor/leaflet/assets.json'];
+
+/**
+ * The online half: served so a navigation can load it, never precached.
+ *
+ * Discovered from disk rather than listed, because there is no service worker
+ * manifest to keep it honest here — a missing online module fails at the moment
+ * the golfer taps "Show round", which is exactly the silent-in-development
+ * failure `app-shell.json` exists to prevent for the offline half.
+ *
+ * @returns {Promise<string[]>}
+ */
+async function onlineModules() {
+  return jsModulesUnder(path.join('src', 'online'));
+}
 
 /**
  * @param {string} name
@@ -41,13 +61,17 @@ async function readManifest(name) {
 }
 
 async function main() {
-  const [shell, pglite] = await Promise.all([
+  const [shell, pglite, leaflet, online] = await Promise.all([
     readManifest('app-shell.json'),
     readManifest(path.join('vendor', 'pglite', 'assets.json')),
+    readManifest(path.join('vendor', 'leaflet', 'assets.json')),
+    onlineModules(),
   ]);
 
   // "./" is the directory itself, served as index.html — nothing to copy.
-  const files = [...shell, ...pglite, ...extras].filter((entry) => entry !== './');
+  const files = [...shell, ...pglite, ...leaflet, ...online, ...extras].filter(
+    (entry) => entry !== './',
+  );
 
   await rm(siteDir, { recursive: true, force: true });
   await mkdir(siteDir, { recursive: true });

@@ -1,22 +1,30 @@
 /**
- * Entry point — a walking skeleton, not a feature.
+ * Composition root.
  *
- * Its job is to prove the three decisions that everything else rests on
- * actually hold on a real device:
+ * Everything the app is made of is wired together here and nowhere else: the
+ * database is opened once, the router is given its routes, and the burger menu
+ * is pointed at them.
  *
- *   TD4  the service worker precaches the shell, so a cold start works offline
- *   TD5  PGlite opens and migrates
- *   TD8  persistent storage is requested, and refusal is reported honestly
- *
- * The car-mode capture UI (UC1) is deliberately absent: it waits on OPEN-3 and
- * belongs to a user story, not to the bootstrap.
+ * The interesting line in this file is the `import()` in the two online routes.
+ * A static import would drag the map and its tile access into the cold-start
+ * path on the first tee, which is exactly what TD13 exists to prevent. ESLint
+ * blocks the static form here; the dynamic one is the intended escape hatch,
+ * taken at the moment the golfer navigates.
  */
 
 import { ensureDurableStorage } from './offline/shared/durability/storage-durability.js';
 import { closeDatabase, openDatabase } from './offline/shared/store/database.js';
 import { currentVersion } from './offline/shared/store/migrations.js';
 import { browserEnvironment, loadNewVersion } from './shell/app-update.js';
+import { el, notice, screenHeader } from './shell/dom.js';
 import { createMenu } from './shell/menu.js';
+import { createRouter } from './shell/router.js';
+
+/** @type {any} */
+let database;
+
+/** @type {{ verdict: string, explanation: string } | undefined} */
+let durability;
 
 /**
  * @param {unknown} error
@@ -27,93 +35,210 @@ function describe(error) {
 }
 
 /**
+ * @param {HTMLElement} list
  * @param {string} label
  * @param {'ok' | 'warn' | 'fail' | 'pending'} state
  * @param {string} detail
  */
-function report(label, state, detail) {
-  const list = document.querySelector('#status');
-  if (!list) return;
-
-  const item = document.createElement('li');
-  item.className = `status status--${state}`;
-  item.innerHTML = `<span class="status__label"></span><span class="status__detail"></span>`;
-
-  const labelNode = item.querySelector('.status__label');
-  const detailNode = item.querySelector('.status__detail');
-  if (labelNode) labelNode.textContent = label;
-  if (detailNode) detailNode.textContent = detail;
-
-  list.append(item);
+function report(list, label, state, detail) {
+  list.append(
+    el('li', { class: `status status--${state}` }, [
+      el('span', { class: 'status__label', text: label }),
+      el('span', { class: 'status__detail', text: detail }),
+    ]),
+  );
 }
 
 async function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) {
-    report('Offline support', 'fail', 'This browser has no service worker support.');
-    return;
-  }
-
+  if (!('serviceWorker' in navigator)) return;
   try {
     // Derived from this module's own location rather than written as "/sw.js":
     // the app is served from a subpath on GitHub Pages, and the worker's scope
     // follows wherever it actually lives.
-    const workerUrl = new URL('../sw.js', import.meta.url);
-    await navigator.serviceWorker.register(workerUrl);
-    report('Offline support', 'ok', 'App shell and database engine are cached for offline use.');
+    await navigator.serviceWorker.register(new URL('../sw.js', import.meta.url));
   } catch (error) {
-    report('Offline support', 'fail', `Registration failed: ${describe(error)}`);
+    console.error('Service worker registration failed:', describe(error));
   }
 }
 
-async function reportStorage() {
-  const status = await ensureDurableStorage();
-  const state = status.verdict === 'safe' ? 'ok' : status.verdict === 'at-risk' ? 'warn' : 'warn';
-  report('Storage durability', state, status.explanation);
-}
+/**
+ * The home screen: what the app can do, and whether the stack underneath it is
+ * healthy. The diagnostics stay because they answer the questions that matter
+ * before a round — is the shell cached, will the round survive, is the database
+ * open — and the answers are worth seeing in the clubhouse car park.
+ *
+ * @param {HTMLElement} outlet
+ * @param {any} context
+ */
+async function renderHome(outlet, context) {
+  const { navigate } = context;
 
-async function reportDatabase() {
-  try {
-    const db = await openDatabase();
-    const version = await currentVersion(db);
-    const { rows } = await db.query('SELECT version() AS version');
-    const server = rows[0]?.version ?? 'unknown build';
+  outlet.append(
+    screenHeader({
+      title: 'GolfTrainer',
+      subtitle: 'Record every stroke on the course. Review and plan from the couch.',
+    }),
+    el('div', { class: 'tiles' }, [
+      el('button', {
+        class: 'tile',
+        type: 'button',
+        id: 'tile-track',
+        text: 'Track round',
+        onclick: () => navigate('track'),
+      }),
+      el('button', {
+        class: 'tile',
+        type: 'button',
+        id: 'tile-courses',
+        text: 'Courses',
+        onclick: () => navigate('courses'),
+      }),
+      el('button', {
+        class: 'tile',
+        type: 'button',
+        id: 'tile-rounds',
+        text: 'Rounds',
+        onclick: () => navigate('rounds'),
+      }),
+      el('button', {
+        class: 'tile',
+        type: 'button',
+        id: 'tile-plan',
+        text: 'Plan round',
+        onclick: () => navigate('plan'),
+      }),
+    ]),
+  );
+
+  const list = el('ul', { id: 'status' });
+  outlet.append(el('h3', { class: 'card__title', text: 'Stack' }), list);
+
+  report(
+    list,
+    'Offline support',
+    'serviceWorker' in navigator ? 'ok' : 'fail',
+    'serviceWorker' in navigator
+      ? 'App shell and database engine are cached for offline use.'
+      : 'This browser has no service worker support.',
+  );
+
+  if (durability) {
     report(
+      list,
+      'Storage durability',
+      durability.verdict === 'safe' ? 'ok' : 'warn',
+      durability.explanation,
+    );
+  }
+
+  try {
+    const version = await currentVersion(database);
+    const { rows } = await database.query('SELECT version() AS version');
+    const server = String(rows[0]?.version ?? 'unknown build');
+    report(
+      list,
       'Database',
       'ok',
       `${server.split(' ').slice(0, 2).join(' ')} — schema version ${version}.`,
     );
   } catch (error) {
-    report('Database', 'fail', `Could not open the local database: ${describe(error)}`);
+    report(list, 'Database', 'fail', `Could not open the local database: ${describe(error)}`);
   }
 }
 
-function wireMenu() {
-  const toggle = document.querySelector('#menu-toggle');
-  const panel = document.querySelector('#menu');
-  if (!(toggle instanceof HTMLElement) || !(panel instanceof HTMLElement)) return;
-
-  createMenu({
-    toggle,
-    panel,
-    handlers: {
-      // Only this one is implemented. Track round, plan round and manage
-      // courses are disabled in the markup until their use cases exist —
-      // a handler that did nothing would be worse than a disabled button.
-      'load-new-version': async () => {
-        const outcome = await loadNewVersion(browserEnvironment());
-        if (outcome.status !== 'reloading') {
-          report('Load new version', 'warn', outcome.message);
-        }
-      },
-    },
-  });
+/**
+ * @param {HTMLElement} outlet
+ * @param {string} message
+ */
+function renderUnavailable(outlet, message) {
+  outlet.replaceChildren(
+    screenHeader({ title: 'Not available' }),
+    notice('warn', message),
+    el('p', {
+      class: 'hint',
+      text: 'Reviewing and planning need the map, and the map only works online. Tracking a round does not.',
+    }),
+  );
 }
 
 async function main() {
-  wireMenu();
-  await registerServiceWorker();
-  await reportStorage();
-  await reportDatabase();
+  const outlet = document.querySelector('#view');
+  const toggle = document.querySelector('#menu-toggle');
+  const panel = document.querySelector('#menu');
+  if (!(outlet instanceof HTMLElement)) return;
+
+  const router = createRouter({
+    outlet,
+    context: () => ({ db: database, durability }),
+    onUnavailable: renderUnavailable,
+    routes: {
+      home: () => ({ name: 'Home', render: renderHome }),
+      courses: async () => ({
+        name: 'Courses',
+        render: (await import('./offline/shared/catalogue/courses-view.js')).render,
+      }),
+      track: async () => ({
+        name: 'Track round',
+        render: (await import('./offline/capture/capture-view.js')).render,
+      }),
+      // Online (§1.4). Not precached, loaded on navigation, refused offline.
+      rounds: async () => ({
+        name: 'Show round',
+        requiresNetwork: true,
+        render: (await import('./online/review/review-view.js')).render,
+      }),
+      plan: async () => ({
+        name: 'Plan round',
+        requiresNetwork: true,
+        render: (await import('./online/planner/planner-view.js')).render,
+      }),
+    },
+  });
+
+  // Wired before anything is awaited, and deliberately so.
+  //
+  // PGlite takes seconds to boot from cold. Wiring the menu behind that await
+  // leaves the burger button present but dead for the whole of it — a tap that
+  // does nothing, on the first tee, which is the exact moment QG2 is about. It
+  // navigates during boot; the router paints when it is ready.
+  if (toggle instanceof HTMLElement && panel instanceof HTMLElement) {
+    createMenu({
+      toggle,
+      panel,
+      handlers: {
+        'track-round': () => router.navigate('track'),
+        'plan-round': () => router.navigate('plan'),
+        'show-round': () => router.navigate('rounds'),
+        'manage-courses': () => router.navigate('courses'),
+        'load-new-version': async () => {
+          const outcome = await loadNewVersion(browserEnvironment());
+          if (outcome.status !== 'reloading') {
+            outlet.prepend(notice('warn', outcome.message));
+          }
+        },
+      },
+    });
+  }
+
+  outlet.append(
+    screenHeader({ title: 'GolfTrainer' }),
+    notice('info', 'Opening the local database…'),
+  );
+
+  void registerServiceWorker();
+  durability = await ensureDurableStorage();
+
+  try {
+    database = await openDatabase();
+  } catch (error) {
+    outlet.replaceChildren(
+      screenHeader({ title: 'GolfTrainer' }),
+      notice('fail', `The local database could not be opened: ${describe(error)}`),
+    );
+    return;
+  }
+
+  await router.start();
 }
 
 window.addEventListener('beforeunload', () => {

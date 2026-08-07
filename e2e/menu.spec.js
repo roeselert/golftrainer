@@ -11,7 +11,7 @@ async function waitForServiceWorkerControl(page) {
   });
 }
 
-test('opens, closes, and offers four destinations', async ({ page }) => {
+test('opens, closes, and offers five destinations', async ({ page }) => {
   await page.goto('index.html');
 
   const toggle = page.locator('#menu-toggle');
@@ -23,7 +23,7 @@ test('opens, closes, and offers four destinations', async ({ page }) => {
   await toggle.click();
   await expect(menu).toBeVisible();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(menu.locator('button[data-action]')).toHaveCount(4);
+  await expect(menu.locator('button[data-action]')).toHaveCount(5);
 
   // Escape closes and hands focus back, so the menu is escapable one-handed.
   await page.keyboard.press('Escape');
@@ -36,14 +36,40 @@ test('opens, closes, and offers four destinations', async ({ page }) => {
   await expect(menu).toBeHidden();
 });
 
-test('shows the unbuilt destinations as disabled rather than pretending', async ({ page }) => {
+test('every destination is live, and the menu says which need a network', async ({ page }) => {
   await page.goto('index.html');
   await page.locator('#menu-toggle').click();
 
-  for (const action of ['track-round', 'plan-round', 'manage-courses']) {
-    await expect(page.locator(`[data-action="${action}"]`)).toBeDisabled();
+  for (const action of [
+    'track-round',
+    'manage-courses',
+    'show-round',
+    'plan-round',
+    'load-new-version',
+  ]) {
+    await expect(page.locator(`[data-action="${action}"]`)).toBeEnabled();
   }
-  await expect(page.locator('[data-action="load-new-version"]')).toBeEnabled();
+
+  // The two online capabilities say so before they are tapped (§1.4). The two
+  // offline ones say the opposite, because it is the thing worth promising.
+  await expect(page.locator('[data-action="show-round"]')).toContainText('Needs a network');
+  await expect(page.locator('[data-action="plan-round"]')).toContainText('Needs a network');
+  await expect(page.locator('[data-action="track-round"]')).toContainText('Works offline');
+  await expect(page.locator('[data-action="manage-courses"]')).toContainText('Works offline');
+});
+
+test('the menu works before the database has finished opening', async ({ page }) => {
+  // PGlite takes seconds to boot from cold. A burger button that is present but
+  // dead for that whole window is the failure this guards: the tap happens on
+  // the first tee, which is what QG2 is about.
+  await page.goto('index.html');
+
+  await page.locator('#menu-toggle').click();
+  await expect(page.locator('#menu')).toBeVisible();
+  await page.locator('[data-action="manage-courses"]').click();
+
+  await expect(page).toHaveURL(/#\/courses/);
+  await expect(page.locator('#course-name')).toBeVisible({ timeout: 30_000 });
 });
 
 test('car mode: every menu target is big enough to hit with a glove on', async ({ page }) => {

@@ -14,11 +14,11 @@ see [Decisions these specs settle](#decisions-these-specs-settle).
 
 | #                            | Name           | Context         | Owns                                        | Status                     |
 | ---------------------------- | -------------- | --------------- | ------------------------------------------- | -------------------------- |
-| [UC1](UC1-track-round.md)    | Track round    | Course, offline | The played round — strokes as they happen   | Specified, not built       |
-| [UC2](UC2-show-round.md)     | Show round     | Couch, online   | Nothing — reads rounds, played and planned  | Specified, not built       |
-| [UC3](UC3-plan-round.md)     | Plan round     | Couch, online   | The planned round — intended strokes        | Specified, not built       |
+| [UC1](UC1-track-round.md)    | Track round    | Course, offline | The played round — strokes as they happen   | Built                      |
+| [UC2](UC2-show-round.md)     | Show round     | Couch, online   | Nothing — reads rounds, played and planned  | Built                      |
+| [UC3](UC3-plan-round.md)     | Plan round     | Couch, online   | The planned round — intended strokes        | Built                      |
 | UC4                          | Compare        | Couch, online   | Nothing — plan against actual               | Not specified — see OPEN-5 |
-| [UC5](UC5-manage-courses.md) | Manage courses | Either, offline | The course catalogue — courses, holes, tees | Specified, not built       |
+| [UC5](UC5-manage-courses.md) | Manage courses | Either, offline | The course catalogue — courses, holes, tees | Built                      |
 
 UC4 is deliberately absent. The shared domain model makes it expressible; it is
 a scope call, not a design question (OPEN-5 in `CLAUDE.md`).

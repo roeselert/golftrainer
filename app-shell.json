@@ -5,11 +5,21 @@
     "manifest.webmanifest",
     "app-shell.json",
     "src/main.js",
+    "src/offline/capture/capture-view.js",
+    "src/offline/positioning/positioning.js",
+    "src/offline/shared/catalogue/course-picker.js",
+    "src/offline/shared/catalogue/courses-view.js",
+    "src/offline/shared/catalogue/courses.js",
+    "src/offline/shared/domain/clubs.js",
     "src/offline/shared/durability/storage-durability.js",
+    "src/offline/shared/rounds/rounds.js",
     "src/offline/shared/store/database.js",
     "src/offline/shared/store/migrations.js",
+    "src/offline/shared/store/migrations/001-domain.js",
     "src/offline/shared/store/migrations/index.js",
     "src/shell/app-update.js",
-    "src/shell/menu.js"
+    "src/shell/dom.js",
+    "src/shell/menu.js",
+    "src/shell/router.js"
   ]
 }
