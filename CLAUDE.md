@@ -4,10 +4,11 @@ Architecture documentation (arc42-inspired). This file is the architecture spine
 it is read first and updated last on every change. See `.claude/skills/timo_agentic_coding_process`
 for the workflow that governs it.
 
-> **Status:** Phase 2 complete — bootstrapped, deployed to GitHub Pages, every
-> quality signal in CI. The shell has a burger menu; of its four destinations
-> only "load new version" is implemented. No use case is built yet — the capture
-> screen (UC1) waits on OPEN-3. Questions marked **[OPEN]** are unresolved.
+> **Status:** Phase 3 started — the use cases are specified in
+> [`docs/use cases/`](docs/use%20cases/README.md); none is built. Phase 2 stands:
+> bootstrapped, deployed to GitHub Pages, every quality signal in CI. The shell
+> has a burger menu; of its four destinations only "load new version" is
+> implemented. Questions marked **[OPEN]** are unresolved.
 
 ---
 
@@ -35,10 +36,17 @@ opposite constraints.
 
 | # | Actor | Context | Goal |
 |---|-------|---------|------|
-| UC1 | Golfer | Course, offline | Capture each stroke while playing, with minimal interaction and no network |
-| UC2 | Golfer | Couch, online | Replay a completed round on a map, seeing where each stroke started and ended |
-| UC3 | Golfer | Couch, online | Simulate a round in advance by placing intended strokes on a map, spot by spot |
+| [UC1](docs/use%20cases/UC1-track-round.md) | Golfer | Course, offline | Capture each stroke while playing, with minimal interaction and no network |
+| [UC2](docs/use%20cases/UC2-show-round.md) | Golfer | Couch, online | Replay a completed round on a map, seeing where each stroke started and ended |
+| [UC3](docs/use%20cases/UC3-plan-round.md) | Golfer | Couch, online | Simulate a round in advance by placing intended strokes on a map, spot by spot |
 | UC4 | Golfer | Couch, online | Compare a played round against the simulation for that hole *(candidate — see [OPEN-5])* |
+| [UC5](docs/use%20cases/UC5-manage-courses.md) | Golfer | Either, offline | Keep the courses they play — name, holes, tee positions — on the device |
+
+Specified in full under [`docs/use cases/`](docs/use%20cases/README.md): trigger,
+flows, business rules, data and acceptance criteria per use case. UC5 was not in
+this table before the specs were written — it fell out of OPEN-4, and it is now
+the first thing that has to be built, because nothing else works without a
+course.
 
 ### Value proposition
 
@@ -182,9 +190,10 @@ the offline core must still compile and run — that is the acceptance test for
 the rule, and the agentic review (§5.2) checks it on every change.
 
 The shared foundation is by definition on the offline critical path. That
-constrains Course Catalogue in particular: its data must be available with no
-network, which is what makes [OPEN-4] an architectural question rather than a
-sourcing preference.
+constrained Course Catalogue in particular: its data has to be available with no
+network, which made OPEN-4 an architectural question rather than a sourcing
+preference. [UC5](docs/use%20cases/UC5-manage-courses.md) settles it the only way
+the rule allows — the golfer enters the course, so there is nothing to fetch.
 
 ---
 
@@ -362,13 +371,35 @@ Both are silent failures: they look fine in development and break on the course.
   and one store; they are separated by dependency direction only. Recorded as
   the dependency rule in §1.4.
 - **Database** — PGlite. Recorded as TD5/TD9.
+- **OPEN-3 — how a stroke is recorded** — one tap on the club the golfer just
+  used, standing at the ball; the position is the current fix, so a stroke
+  records *where the ball came to rest*, not where it was struck from. Putts are
+  a count entered when the hole is finished. Specified in
+  [UC1](docs/use%20cases/UC1-track-round.md); the same semantics give a planned
+  stroke in [UC3](docs/use%20cases/UC3-plan-round.md) its meaning, which is what
+  keeps UC4 a query rather than a project.
+- **OPEN-4 — where course data comes from** — the golfer enters it. Name and
+  hole count, then tee positions captured on the tee or placed on the map later;
+  a course is usable with no tee positions at all. No provider, no import, so
+  the Course Catalogue keeps its place in the offline shared foundation with
+  nothing to fetch. Specified in [UC5](docs/use%20cases/UC5-manage-courses.md).
+- **OPEN-8 — which clubs** — a fixed bag of twelve: driver, irons 4–9, four
+  wedges, putter. Not configurable, no woods, no hybrids. Twelve is a car-mode
+  layout decision (QG2) before it is a data one — three across and four down
+  fits a phone, fourteen glove-sized targets does not. `Club` is a column on
+  every stroke, so this is settled before the first migration rather than grown
+  afterwards. Specified in [UC1](docs/use%20cases/UC1-track-round.md) BR11.
+- **OPEN-9 — penalty strokes and lie** — a penalty is recorded as **a second
+  stroke at the same position**: the golfer taps the club again without moving.
+  No field on `Stroke`, no button on the grid, and the hole's total matches the
+  scorecard because two strokes at one spot is what actually happened. Lie is
+  not captured at all. The cost is one rule downstream — UC2 may not merge
+  coincident points, or it would silently delete the penalty (UC2 BR8).
 
 ### Still open
 
 | # | Question | Why it blocks |
 |---|----------|---------------|
-| OPEN-3 | How is a stroke recorded? One tap at the ball's position, or start + end per stroke? Is club, lie, or penalty captured too? | Defines the core entity and the interaction budget for QG2. *Deferred by decision — to be settled in the UC1 use-case spec (Phase 3), not here* |
-| OPEN-4 | Where does course/hole data come from — a provider, drawn by the golfer while simulating, or inferred from captured positions? | Course Catalogue is in the shared foundation and therefore on the offline critical path. An online-only source would breach the dependency rule |
 | OPEN-5 | Is plan-vs-actual comparison (UC4) in scope, and for which release? | No longer an architectural question — the shared domain model (§1.4) already makes it expressible. Now purely a scope/priority call |
 | OPEN-6 | Single device only, or does a round ever sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
 | OPEN-7 | Which basemap/tile provider for the couch views — OSM-based (Leaflet + a tile host), Mapbox, Google? Satellite imagery or vector? | Licensing and attribution obligations (see §1.2). Couch-only, so it does not affect QG1 and can wait until UC2 |
