@@ -3,6 +3,17 @@
 Round Simulation, Map Visualisation and Tile Access live here (CLAUDE.md §1.4).
 Empty for now — UC2 and UC3 are not built yet.
 
+The map is Leaflet with the basemap behind Tile Access (TD7/TD7a): German state
+orthophotos where they cover the course, OSM standard tiles elsewhere. Tile
+Access exists so the imagery is a URL template in one module rather than an SDK
+the map code is written inside — which is also why Google Maps was not chosen,
+since its terms forbid its content appearing on or beside any other map.
+
+One rule follows from the dependency rule and is easy to break by accident:
+**which basemap covers a course is resolved here, from the position, at display
+time.** It must never become a column on `Course` — the catalogue lives in the
+offline core, and a tile provider is an online concern.
+
 ## The rule that governs this directory
 
 > Online capabilities may depend on offline capabilities. Never the reverse.

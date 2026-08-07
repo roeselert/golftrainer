@@ -177,10 +177,11 @@ Two consequences worth stating rather than discovering later:
 | OPEN-4 — where course data comes from | UC5           | The golfer enters it. No provider, no import, nothing to be online for. Tee positions are captured on the tee or placed on the map later. |
 | OPEN-8 — which clubs                  | UC1 BR11      | A fixed bag of twelve: driver, irons 4–9, four wedges, putter. Not configurable, no woods, no hybrids.                                    |
 | OPEN-9 — penalty strokes and lie      | UC1 BR12      | A penalty is a second stroke at the same position — no field, no button. Lie is not captured at all.                                      |
+| OPEN-7 — the basemap                  | TD7/TD7a      | Leaflet, with the imagery behind Tile Access: German state orthophotos where they cover the course, OSM standard tiles elsewhere.         |
 
 ## Still open
 
-| #      | Question                                                          | Blocks   |
-| ------ | ----------------------------------------------------------------- | -------- |
-| OPEN-7 | Which basemap and tile provider (`CLAUDE.md` TD7).                | UC2, UC3 |
-| OPEN-5 | Whether plan-versus-actual (UC4) is built, and for which release. | UC4      |
+| #       | Question                                                                                   | Blocks   |
+| ------- | ------------------------------------------------------------------------------------------ | -------- |
+| OPEN-5  | Whether plan-versus-actual (UC4) is built, and for which release.                          | UC4      |
+| OPEN-10 | Whether the orthophoto service offers Web-Mercator tiles, or whether Tile Access uses WMS. | UC2, UC3 |

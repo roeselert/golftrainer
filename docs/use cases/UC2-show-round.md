@@ -106,6 +106,7 @@ figures, the golfer jumps straight to that hole's map.
 | E4  | Offline                                             | The map cannot be drawn and says so. What happens to the overview and table is BR6                                                                                                                                                                                               |
 | E5  | The tile provider fails                             | Reported. The route is still drawn on whatever the map can render, because the geometry is local data                                                                                                                                                                            |
 | E6  | A hole was played with no strokes recorded (UC1 A5) | Shown as "not recorded", with its putts if there are any. Not as a zero                                                                                                                                                                                                          |
+| E7  | The course lies outside the orthophoto coverage     | The map falls back to OSM standard tiles and says that no imagery is available here. A silent fallback would read as a failed load, and the golfer would keep waiting for a photo that is never coming (TD7a)                                                                    |
 
 ## 5. Business rules
 
@@ -117,7 +118,7 @@ figures, the golfer jumps straight to that hole's map.
 | BR4 | Totals are computed from what is stored, never adjusted to look plausible. A round is shown as it was recorded                                                                                                                                                                                       |
 | BR5 | Positions are shown with their accuracy, so the golfer can tell a 3 m fix from a 40 m one                                                                                                                                                                                                            |
 | BR6 | The overview and the table need no network, but they live in the online half for now. Making them reachable on the course would mean moving them into the offline core, and nothing in UC1 asks for that — car mode (TD3) is the on-course experience. This is a decision, not an oversight          |
-| BR7 | Basemap attribution is visible wherever tiles are shown (§1.2)                                                                                                                                                                                                                                       |
+| BR7 | Basemap attribution is visible wherever tiles are shown, and it names whichever layer is actually being drawn — the imagery is CC BY 4.0, so naming the source is a licence obligation and not a courtesy (TD7a)                                                                                     |
 | BR8 | **Coincident stroke positions are never merged.** Two strokes at one spot is how a penalty is recorded (UC1 A6), so a map that collapses them into one marker deletes a stroke the golfer took. They are drawn as a stack carrying the count, and the table lists them as the separate rows they are |
 
 ## 6. Data requirements
@@ -177,7 +178,10 @@ strokes, and the hole's total counts both.
 
 ## 8. Open questions
 
-- **OPEN-7** — the basemap, shared with UC3.
+- Whether the imagery is worth it on the golfer's own course. The orthophotos
+  are 20 cm and reflown every few years, which should show fairway, bunker and
+  green outlines clearly — but that is an expectation until someone opens their
+  home club and looks (TD7a).
 - **OPEN-5** — whether plan-versus-actual (UC4) is built, and whether it is a
   fourth view here or a use case of its own.
 - Should distances between strokes be derived and shown? It is the first thing

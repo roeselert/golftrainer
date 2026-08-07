@@ -96,7 +96,7 @@ flowchart TB
     end
 
     gnss["GNSS / GPS<br/><i>device location services</i>"]
-    tiles["Map tile provider<br/><i>online only</i>"]
+    tiles["Basemap services<br/><i>state orthophotos (CC BY) · OSM tiles</i><br/><i>online only, no account</i>"]
     storage[("Device storage<br/><i>on-device, offline</i>")]
     host["GitHub Pages<br/><i>static host — install & update only</i>"]
 
@@ -124,6 +124,10 @@ it delivers the app and its updates, and after the service worker has installed
 a round captured normally. Its one hard requirement is HTTPS — service workers
 and the Geolocation API both demand a secure context, so QG1 and UC1 rest on it
 (TD11).
+
+The basemap services are public and unauthenticated by decision (TD7a): no API
+key, no billing account, no contract with a vendor. That is why they can be
+drawn as a plain external dependency and not as an integration.
 
 ---
 
@@ -207,7 +211,8 @@ the rule allows — the golfer enters the course, so there is nothing to fetch.
 | TD4 | Offline shell | **Service worker**, precached app shell | Cache-less, online-first | The app must launch from a cold start in airplane mode. Non-negotiable for QG1 |
 | TD5 | Persistence | **PGlite** (Postgres compiled to WASM, `@electric-sql/pglite`) | Raw IndexedDB, localStorage, SQLite/wa-sqlite | One relational schema shared by both contexts (§1.4), real SQL for the spatial and plan-vs-actual queries UC2/UC4 need, and transactions that serve QG3. Dual-licensed Apache-2.0 / PostgreSQL |
 | TD6 | Positioning | **Geolocation API** (`watchPosition`) | Device-specific GNSS APIs | The only option available to a PWA; sufficient for stroke positions |
-| TD7 | Basemap / tiles | **[OPEN-7]** | — | Couch-only, so it does not affect QG1. Deferred until UC2/UC3 are built |
+| TD7 | Map library | **Leaflet** (BSD-2-Clause), vendored like PGlite, with the tile source behind the Tile Access component | Google Maps JS SDK; Mapbox GL JS; MapLibre GL JS | Leaflet is a single JS + CSS file with no build step (TD2) and it treats the basemap as a URL template, which keeps Tile Access a seam rather than a framework. See TD7a for why that seam is the whole decision |
+| TD7a | Basemap imagery | **German state orthophotos (DOP20, 20 cm, CC BY 4.0)** — Schleswig-Holstein and Niedersachsen via their open WMS/WMTS — with **OSM standard tiles** as the non-imagery fallback | Google Maps; Esri World Imagery; Mapbox Satellite; OSM only | Keyless, billing-free, no contract, and higher resolution than the use cases need. Attribution is one line. Google was the favourite and is rejected on terms, not on price or quality: its "No Use With Non-Google Maps" clause forbids showing its content alongside or inside any other map and forbids access outside its own SDK, so choosing it would replace the seam with a vendor's map API. OSM alone was never a candidate — it has no imagery, and a fairway the golfer cannot see is not a basemap |
 | TD9 | PGlite delivery | **Served from our own origin and precached; reproduced into `vendor/` by `npm run vendor`, not committed** | CDN import at runtime (jsDelivr); committing `vendor/` to git | A CDN fetch on the offline critical path would breach the dependency rule in §1.4 — the WASM must be on the device before the first tee. It is *generated* rather than committed because it is 17 MB of binary per version, and git history cannot shed it on the next upgrade |
 | TD10 | Enforcing the dependency rule | **ESLint, failing the build** | Convention and review; a custom dependency-graph checker | An architecture rule that only lives in prose erodes. `no-restricted-imports` blocks imports from `src/online/` into `src/offline/`, and `no-restricted-globals` blocks `fetch`/`XMLHttpRequest`/`WebSocket`/`EventSource` there — so the offline core cannot quietly grow a network call either |
 | TD11 | Hosting | **GitHub Pages**, deployed from CI on the default branch | A VPS; Netlify/Vercel; Cloudflare Pages | Static hosting over HTTPS is all a PWA needs — no server, no runtime, nothing to operate. HTTPS is not optional: service workers and the Geolocation API both require a secure context, so QG1 and UC1 depend on it |
@@ -231,6 +236,37 @@ Recorded because they are load-bearing, not incidental:
 - **The domain model is now a SQL schema**, so it needs migrations from the
   first commit that writes a table. Rounds captured under an old schema must
   survive an app update — QG3 covers upgrades, not just crashes.
+
+### Consequences of TD7 / TD7a (the map)
+
+- **Leaflet becomes the second runtime dependency, and only in the online
+  half.** It is vendored, not fetched from a CDN, for the same reason PGlite is
+  (TD9) — though here the reason is consistency rather than QG1, since nothing
+  on this path is on the offline critical path.
+- **The tile source may never become a column on `Course`.** Which imagery
+  service covers a course is a function of where it is, and it is an *online*
+  concern; putting it in the catalogue would drag it into the offline core and
+  breach the dependency rule (§1.4). Tile Access resolves the provider from the
+  position at display time, in `src/online/`, and the offline core stays unaware
+  that basemaps exist at all.
+- **Attribution is a functional requirement, not a footer.** CC BY 4.0 obliges
+  us to name the source, and Leaflet's attribution control has to carry whatever
+  the active layer requires — which changes when the layer does.
+- **Coverage is national, and the app has to say so.** Outside the states whose
+  orthophotos we use, there is no imagery and the map falls back to OSM
+  standard tiles. That is a visible degradation and is specified as one
+  (UC2 E7, UC3 E6) rather than left to look like a loading failure.
+- **Rejecting Google also rejects tile caching, permanently and by choice.**
+  Their terms forbid it anyway, but the open services do not — so the option of
+  precaching a course's imagery stays open if the "no offline map" non-goal is
+  ever revisited. Nothing in this decision closes that door.
+- **One assumption is unverified.** The Schleswig-Holstein WMTS was not
+  reachable from the machine this decision was researched on, so whether it
+  offers a Web-Mercator (`GoogleMapsCompatible`) tile matrix set is unconfirmed.
+  If it does, Leaflet consumes it as a plain XYZ template; if it only publishes
+  ETRS89/UTM32 (EPSG:25832), Tile Access uses the WMS endpoint instead. This is
+  the first thing to check when UC2 is built, and it changes an implementation
+  detail, not the decision.
 
 ### TD8 — Storage durability on iOS (serves QG3)
 
@@ -395,6 +431,13 @@ Both are silent failures: they look fine in development and break on the course.
   scorecard because two strokes at one spot is what actually happened. Lie is
   not captured at all. The cost is one rule downstream — UC2 may not merge
   coincident points, or it would silently delete the penalty (UC2 BR8).
+- **OPEN-7 — the basemap** — Leaflet, with the imagery behind Tile Access:
+  German state orthophotos (DOP20, 20 cm, CC BY 4.0) where they cover the
+  course, OSM standard tiles everywhere else. Recorded as TD7/TD7a. Google was
+  the preferred option and lost on its terms rather than its price or its
+  imagery — a basemap that may not be shown alongside any other map is not a
+  tile provider, it is a map API to build inside, and it would have turned Tile
+  Access from a seam into a dependency on a vendor's SDK.
 
 ### Still open
 
@@ -402,4 +445,4 @@ Both are silent failures: they look fine in development and break on the course.
 |---|----------|---------------|
 | OPEN-5 | Is plan-vs-actual comparison (UC4) in scope, and for which release? | No longer an architectural question — the shared domain model (§1.4) already makes it expressible. Now purely a scope/priority call |
 | OPEN-6 | Single device only, or does a round ever sync to another device or a backend? | Local-only removes an entire external system and all its privacy surface |
-| OPEN-7 | Which basemap/tile provider for the couch views — OSM-based (Leaflet + a tile host), Mapbox, Google? Satellite imagery or vector? | Licensing and attribution obligations (see §1.2). Couch-only, so it does not affect QG1 and can wait until UC2 |
+| OPEN-10 | Does the Schleswig-Holstein WMTS publish a Web-Mercator tile matrix set, or only ETRS89/UTM32? | Decides whether Tile Access consumes it as an XYZ template or through WMS. An implementation detail of TD7a, not a reopening of it — first thing to check when UC2 is built |
