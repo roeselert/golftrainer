@@ -25,15 +25,30 @@ import { repoRoot } from './source-modules.mjs';
 const iconsDir = path.join(repoRoot, 'icons');
 
 /**
- * `apple-touch-icon` is 180 because that is what iOS asks for; 192 and 512 are
- * the sizes Chrome's install criteria name. The maskable variant is the same
- * art — it is drawn inside the safe zone, so it needs no separate composition.
+ * 152, 167 and 180 are the three `apple-touch-icon` sizes iOS asks for — iPad,
+ * iPad Pro and iPhone at @3x. 192 and 512 are the sizes Chrome's install
+ * criteria name. The maskable variant is the same art: it is drawn inside the
+ * safe zone, so it needs no separate composition.
  */
 const sizes = [
+  { file: 'icon-152.png', size: 152 },
+  { file: 'icon-167.png', size: 167 },
   { file: 'icon-180.png', size: 180 },
   { file: 'icon-192.png', size: 192 },
   { file: 'icon-512.png', size: 512 },
 ];
+
+/**
+ * The icon's own background, painted behind the art.
+ *
+ * Opacity is not a preference here. iOS composites any alpha channel in an
+ * `apple-touch-icon` onto **black**, so a transparent corner becomes a black
+ * corner on the home screen. The SVG's own rect covers the canvas today, which
+ * is why the current PNGs have no alpha at all — but relying on that means an
+ * edit to the artwork could reintroduce transparency silently. Painting it here
+ * as well makes it impossible.
+ */
+const BACKGROUND = '#10231a';
 
 async function main() {
   const svg = await readFile(path.join(iconsDir, 'icon.svg'), 'utf8');
@@ -52,17 +67,13 @@ async function main() {
         deviceScaleFactor: 1,
       });
 
-      // A transparent page behind the art, so nothing of the browser's own
-      // white leaks into the corners when a mask rounds them.
       await page.setContent(
-        `<style>html,body{margin:0;padding:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${svg}`,
+        `<style>html,body{margin:0;padding:0;background:${BACKGROUND}}` +
+          `svg{display:block;width:${size}px;height:${size}px}</style>${svg}`,
         { waitUntil: 'load' },
       );
 
-      await page.screenshot({
-        path: path.join(iconsDir, file),
-        omitBackground: true,
-      });
+      await page.screenshot({ path: path.join(iconsDir, file) });
       await page.close();
     }
   } finally {
