@@ -13,3 +13,6 @@ report/
 test-results/
 playwright-report/
 .jscpd/
+
+# Assembled deployment, produced by `npm run site`.
+_site/

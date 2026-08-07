@@ -52,7 +52,11 @@ async function registerServiceWorker() {
   }
 
   try {
-    await navigator.serviceWorker.register('/sw.js');
+    // Derived from this module's own location rather than written as "/sw.js":
+    // the app is served from a subpath on GitHub Pages, and the worker's scope
+    // follows wherever it actually lives.
+    const workerUrl = new URL('../sw.js', import.meta.url);
+    await navigator.serviceWorker.register(workerUrl);
     report('Offline support', 'ok', 'App shell and database engine are cached for offline use.');
   } catch (error) {
     report('Offline support', 'fail', `Registration failed: ${describe(error)}`);

@@ -40,6 +40,8 @@ export default [
       'report/**',
       'test-results/**',
       '.claude/**',
+      // Assembled deployment: copies of files already linted at their source.
+      '_site/**',
     ],
   },
 

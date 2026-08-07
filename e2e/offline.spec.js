@@ -29,7 +29,7 @@ async function waitForServiceWorkerControl(page) {
 }
 
 test('reports a healthy stack when online', async ({ page }) => {
-  await page.goto('/index.html');
+  await page.goto('index.html');
 
   await expect(page.locator('#status .status').first()).toBeVisible();
   await expect(page.locator('.status--fail')).toHaveCount(0);
@@ -39,7 +39,7 @@ test('reports a healthy stack when online', async ({ page }) => {
 });
 
 test('launches from a cold start with no network', async ({ page, context }) => {
-  await page.goto('/index.html');
+  await page.goto('index.html');
   await waitForServiceWorkerControl(page);
 
   // A cold start, not a reload of a warm page: close the page, cut the network,
@@ -48,7 +48,7 @@ test('launches from a cold start with no network', async ({ page, context }) => 
   await page.close();
 
   const revisit = await context.newPage();
-  await revisit.goto('/index.html');
+  await revisit.goto('index.html');
 
   await expect(revisit.locator('#status .status').first()).toBeVisible();
   await expect(revisit.locator('.status--fail')).toHaveCount(0);
@@ -58,21 +58,21 @@ test('launches from a cold start with no network', async ({ page, context }) => 
 });
 
 test('the database survives being closed and reopened', async ({ page, context }) => {
-  await page.goto('/index.html');
+  await page.goto('index.html');
   await waitForServiceWorkerControl(page);
 
   await page.evaluate(async () => {
-    const { openDatabase } = await import('/src/offline/shared/store/database.js');
+    const { openDatabase } = await import('./src/offline/shared/store/database.js');
     const db = await openDatabase();
     await db.exec('CREATE TABLE IF NOT EXISTS durability_probe (note text)');
     await db.query('INSERT INTO durability_probe (note) VALUES ($1)', ['round in progress']);
   });
 
   const revisit = await context.newPage();
-  await revisit.goto('/index.html');
+  await revisit.goto('index.html');
 
   const rows = await revisit.evaluate(async () => {
-    const { openDatabase } = await import('/src/offline/shared/store/database.js');
+    const { openDatabase } = await import('./src/offline/shared/store/database.js');
     const db = await openDatabase();
     const result = await db.query('SELECT note FROM durability_probe');
     return result.rows;
