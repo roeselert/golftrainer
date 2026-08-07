@@ -62,6 +62,121 @@
         font-size: 1rem;
       }
 
+      /*
+        Car mode (TD3). Every tap target below is at least 3rem, and the menu
+        items are 4rem: this menu is opened on the sixteenth tee, one-handed,
+        wearing a glove, with a group waiting. Anything smaller fails QG2.
+      */
+      .appbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        position: relative;
+      }
+
+      .burger {
+        flex: none;
+        width: 3.5rem;
+        height: 3.5rem;
+        display: grid;
+        place-items: center;
+        gap: 0;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .burger:focus-visible,
+      .menu__item:focus-visible {
+        outline: 3px solid var(--ok);
+        outline-offset: 2px;
+      }
+
+      .burger__bars,
+      .burger__bars::before,
+      .burger__bars::after {
+        display: block;
+        width: 1.5rem;
+        height: 2px;
+        background: currentColor;
+        border-radius: 2px;
+      }
+
+      .burger__bars {
+        position: relative;
+      }
+
+      .burger__bars::before,
+      .burger__bars::after {
+        content: '';
+        position: absolute;
+        left: 0;
+      }
+
+      .burger__bars::before {
+        top: -0.5rem;
+      }
+      .burger__bars::after {
+        top: 0.5rem;
+      }
+
+      .menu {
+        position: absolute;
+        top: 4rem;
+        right: 0;
+        z-index: 10;
+        width: min(22rem, calc(100vw - 2.5rem));
+        background: var(--surface);
+        border: 1px solid #2b5039;
+        border-radius: 0.75rem;
+        box-shadow: 0 1rem 2rem rgb(0 0 0 / 45%);
+        overflow: hidden;
+      }
+
+      .menu[hidden] {
+        display: none;
+      }
+
+      .menu__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .menu__item {
+        width: 100%;
+        min-height: 4rem;
+        display: block;
+        text-align: left;
+        padding: 0.875rem 1.125rem;
+        background: none;
+        border: 0;
+        border-bottom: 1px solid #23412e;
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .menu__list li:last-child .menu__item {
+        border-bottom: 0;
+      }
+
+      .menu__item:disabled {
+        color: var(--muted);
+        cursor: not-allowed;
+      }
+
+      .menu__hint {
+        display: block;
+        color: var(--muted);
+        font-size: 0.875rem;
+        margin-top: 0.125rem;
+      }
+
       #status {
         list-style: none;
         margin: 0;
@@ -106,8 +221,59 @@
     </style>
   </head>
   <body>
-    <h1>GolfTrainer</h1>
-    <p class="lede">Bootstrap check — offline shell, local database, storage durability.</p>
+    <header class="appbar">
+      <div>
+        <h1>GolfTrainer</h1>
+        <p class="lede">Bootstrap check — offline shell, local database, storage durability.</p>
+      </div>
+
+      <button
+        id="menu-toggle"
+        class="burger"
+        type="button"
+        aria-expanded="false"
+        aria-controls="menu"
+        aria-label="Menu"
+      >
+        <span class="burger__bars" aria-hidden="true"></span>
+      </button>
+
+      <!--
+        Three items are disabled and say so. They are the destinations the app
+        is being built towards; showing them as if they worked would be a lie
+        the first tap exposes.
+      -->
+      <nav id="menu" class="menu" hidden aria-label="Main menu">
+        <ul class="menu__list">
+          <li>
+            <button class="menu__item" type="button" data-action="track-round" disabled>
+              Track round
+              <span class="menu__hint">Not built yet — waiting on how a stroke is recorded</span>
+            </button>
+          </li>
+          <li>
+            <button class="menu__item" type="button" data-action="plan-round" disabled>
+              Plan round
+              <span class="menu__hint">Not built yet — needs the map</span>
+            </button>
+          </li>
+          <li>
+            <button class="menu__item" type="button" data-action="manage-courses" disabled>
+              Manage courses
+              <span class="menu__hint">Not built yet — needs a course source</span>
+            </button>
+          </li>
+          <li>
+            <button class="menu__item" type="button" data-action="load-new-version">
+              Load new version
+              <span class="menu__hint">
+                Clears the cached app and reinstalls it. Your rounds are not affected.
+              </span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </header>
 
     <noscript>GolfTrainer needs JavaScript to record a round.</noscript>
     <ul id="status"></ul>

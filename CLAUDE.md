@@ -4,9 +4,10 @@ Architecture documentation (arc42-inspired). This file is the architecture spine
 it is read first and updated last on every change. See `.claude/skills/timo_agentic_coding_process`
 for the workflow that governs it.
 
-> **Status:** Phase 2 complete — the project is bootstrapped and every quality
-> signal runs in CI. No use case is implemented yet; the capture screen (UC1)
-> waits on OPEN-3. Questions marked **[OPEN]** below are still unresolved.
+> **Status:** Phase 2 complete — bootstrapped, deployed to GitHub Pages, every
+> quality signal in CI. The shell has a burger menu; of its four destinations
+> only "load new version" is implemented. No use case is built yet — the capture
+> screen (UC1) waits on OPEN-3. Questions marked **[OPEN]** are unresolved.
 
 ---
 
@@ -202,6 +203,7 @@ sourcing preference.
 | TD10 | Enforcing the dependency rule | **ESLint, failing the build** | Convention and review; a custom dependency-graph checker | An architecture rule that only lives in prose erodes. `no-restricted-imports` blocks imports from `src/online/` into `src/offline/`, and `no-restricted-globals` blocks `fetch`/`XMLHttpRequest`/`WebSocket`/`EventSource` there — so the offline core cannot quietly grow a network call either |
 | TD11 | Hosting | **GitHub Pages**, deployed from CI on the default branch | A VPS; Netlify/Vercel; Cloudflare Pages | Static hosting over HTTPS is all a PWA needs — no server, no runtime, nothing to operate. HTTPS is not optional: service workers and the Geolocation API both require a secure context, so QG1 and UC1 depend on it |
 | TD12 | Path resolution | **Every path relative, none rooted at `/`** | A hard-coded base path; a custom domain at the root | GitHub Pages serves a project repository under `/<repo>/`. An absolute path resolves outside the app there — including the service worker scope and the PGlite WASM. Relative paths work at any mount point, so the app is not coupled to where it is published |
+| TD13 | Where navigation lives | **`src/shell/` — a third zone, neither offline core nor online capability** | Putting the menu in `src/offline/`; splitting it per context | The burger menu leads to Round Capture (offline) *and* Round Simulation (online), so it belongs to neither. It is precached and opens on the course, so it carries the offline constraints anyway: no network calls, and no *static* import of an online capability. A dynamic `import()` at the moment the golfer taps an online destination is the intended escape hatch, and ESLint restricts only static imports |
 
 ### Consequences of TD5 (PGlite)
 
@@ -268,7 +270,10 @@ app-shell.json          precache list; verified against disk by a test
 manifest.webmanifest    installability, which TD8 depends on
 
 src/
-  main.js               walking skeleton: proves TD4, TD5 and TD8 hold
+  main.js               composition root; also the walking skeleton (TD4/5/8)
+  shell/                navigation — belongs to neither context (TD13)
+    menu.js             burger menu behaviour
+    app-update.js       "load new version": clear caches, reinstall
   offline/              works with no network — may not import from online/
     shared/             the shared foundation of §1.4
       store/            PGlite connection + schema migrations
@@ -335,6 +340,12 @@ Both are silent failures: they look fine in development and break on the course.
   service worker's install fetch 404'd, and *nothing* was cached. The app was
   fine at the root and broken under a subpath. Signal 2.2.8 caught it; both
   manifests are now precached and deployed.
+- **An update button that bricks the app.** "Load new version" deletes the
+  precache. Run it with no network and there is nothing to reinstall from: the
+  app is dead until the golfer finds reception — the exact failure QG1 exists
+  to prevent. Being offline is therefore a hard refusal, not a warning, and the
+  worker is unregistered rather than merely emptied so the reload rebuilds the
+  precache instead of quietly running network-only.
 
 ---
 

@@ -81,8 +81,11 @@ export default [
       'e2e/**/*.js',
       'eslint.config.mjs',
       'playwright.config.js',
+      'playwright.pages.config.js',
     ],
-    languageOptions: { globals: globals.node },
+    // Specs are Node code that also contains browser code, inside
+    // `page.evaluate` callbacks that run in the page rather than the runner.
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
       'no-console': 'off',
       // Tooling legitimately builds paths from resolved module locations.
@@ -110,6 +113,40 @@ export default [
               group: ['**/online/**', '**/online'],
               message:
                 'Dependency rule violation (CLAUDE.md §1.4): the offline core must not depend on an online capability. Dependencies point one way only — online may import offline, never the reverse.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': ['error', ...networkGlobals],
+    },
+  },
+
+  // ---------------------------------------------------------------------
+  // The app shell (CLAUDE.md TD13).
+  //
+  // Navigation belongs to neither half: the burger menu leads to Round
+  // Capture (offline) and to Round Simulation (online) alike. It is precached
+  // and it opens on the course, so it carries the offline constraints even
+  // though it is not part of the offline core:
+  //
+  //   - no network calls, same as the offline core
+  //   - no *static* import of an online capability, which would drag it into
+  //     the cold-start path
+  //
+  // A dynamic import() at the moment the golfer taps an online destination is
+  // the intended escape hatch, and is deliberately not restricted here.
+  // ---------------------------------------------------------------------
+  {
+    files: ['src/shell/**/*.js', 'src/main.js'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/online/**', '**/online'],
+              message:
+                'The shell must boot with no network, so an online capability cannot be imported statically. Load it with a dynamic import() when the golfer navigates to it.',
             },
           ],
         },
