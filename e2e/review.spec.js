@@ -199,3 +199,71 @@ test('UC3 AC3 — planning refuses to run offline instead of opening a mapless f
 
   await context.setOffline(false);
 });
+
+test('UC3 BR10 — each planned stroke shows how far it has to carry', async ({ page }) => {
+  await page.goto('index.html#/courses');
+  await page.locator('#course-name').fill('Gut Kaden');
+  await page.locator('#add-18').click();
+  await page.locator('[data-capture-tee="1"]').click();
+  await expect(page.locator('.notice--ok')).toBeVisible();
+
+  await page.goto('index.html#/plan');
+  await page.locator('#plan-course-choice [data-course]').first().click();
+  await expect(page.locator('#plan-map')).toBeVisible();
+
+  const box = await page.locator('#plan-map').boundingBox();
+  const centreX = (box?.width ?? 400) / 2;
+  const centreY = (box?.height ?? 400) / 2;
+
+  // The map opens centred on the tee, so a tap at the centre is a stroke of
+  // roughly zero — and one a little away from it is a measurable distance.
+  await page.locator('#plan-map').click({ position: { x: centreX + 60, y: centreY } });
+  await page.locator('#plan-map').click({ position: { x: centreX + 100, y: centreY } });
+
+  const first = page.locator('#plan-strokes [data-sequence="1"] .row__distance');
+  const second = page.locator('#plan-strokes [data-sequence="2"] .row__distance');
+
+  // The first leg names the tee; the rest are from the stroke before.
+  await expect(first).toContainText('from tee');
+  await expect(first).toContainText('m');
+  await expect(second).not.toContainText('from tee');
+  await expect(second).toContainText('m');
+
+  /** @param {string | null} text */
+  const metres = (text) => Number((text ?? '').replace(/[^0-9.]/g, ''));
+
+  const firstLeg = metres(await first.textContent());
+  const secondLeg = metres(await second.textContent());
+
+  // Both taps were on the same horizontal line, the second 40 px further out
+  // than the first was from the tee — so the second leg is the shorter one.
+  expect(firstLeg).toBeGreaterThan(0);
+  expect(secondLeg).toBeGreaterThan(0);
+  expect(secondLeg).toBeLessThan(firstLeg);
+
+  // And the total is the sum of the legs, not a separate guess.
+  const total = metres(await page.locator('#plan-total .row__distance').textContent());
+  expect(Math.abs(total - (firstLeg + secondLeg))).toBeLessThanOrEqual(1);
+});
+
+test('a planned stroke keeps its distance when the marker is dragged', async ({ page }) => {
+  await page.goto('index.html#/courses');
+  await page.locator('#course-name').fill('Treudelberg');
+  await page.locator('#add-9').click();
+  await page.locator('[data-capture-tee="1"]').click();
+  await expect(page.locator('.notice--ok')).toBeVisible();
+
+  await page.goto('index.html#/plan');
+  await page.locator('#plan-course-choice [data-course]').first().click();
+  await page.locator('#plan-map').click({ position: { x: 220, y: 150 } });
+
+  const distance = page.locator('#plan-strokes [data-sequence="1"] .row__distance');
+  const before = await distance.textContent();
+
+  // Drag the placed stroke further from the tee; the distance must follow.
+  const marker = page.locator('#plan-map .leaflet-marker-draggable').first();
+  await marker.dragTo(page.locator('#plan-map'), { targetPosition: { x: 320, y: 150 } });
+
+  await expect(distance).not.toHaveText(before ?? '');
+  await expect(distance).toContainText('from tee');
+});

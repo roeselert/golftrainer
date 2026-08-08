@@ -128,10 +128,10 @@ export default [
   // ---------------------------------------------------------------------
   // The app shell (CLAUDE.md TD13).
   //
-  // Navigation belongs to neither half: the burger menu leads to Round
-  // Capture (offline) and to Round Simulation (online) alike. It is precached
-  // and it opens on the course, so it carries the offline constraints even
-  // though it is not part of the offline core:
+  // Navigation belongs to neither half: the router reaches Round Capture
+  // (offline) and Round Simulation (online) alike. It is precached and it runs
+  // on the course, so it carries the offline constraints even though it is not
+  // part of the offline core:
   //
   //   - no network calls, same as the offline core
   //   - no *static* import of an online capability, which would drag it into
