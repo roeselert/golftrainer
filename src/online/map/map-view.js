@@ -148,9 +148,11 @@ export async function createMap(container, { centre, zoom = 16, onTrouble }) {
  * @param {{ latitude: number, longitude: number } | null} hole.teePosition
  * @param {{ sequence: number, club: string, position: any }[]} hole.strokes
  * @param {(stroke: any) => string} label
+ * @param {object} [options]
+ * @param {boolean} [options.fitBounds] Re-frame the map around the hole.
  * @returns {any} the layer group, so the caller can remove it
  */
-export function drawHole(leaflet, map, hole, label) {
+export function drawHole(leaflet, map, hole, label, { fitBounds = true } = {}) {
   const group = leaflet.layerGroup().addTo(map);
   const positioned = hole.strokes.filter((stroke) => stroke.position !== null);
 
@@ -188,7 +190,10 @@ export function drawHole(leaflet, map, hole, label) {
       .addTo(group);
   }
 
-  if (line.length > 0) {
+  // Reviewing a finished hole wants the whole hole in frame. *Placing* strokes
+  // does not: re-framing after each tap moves the map under the golfer's
+  // finger, so the next tap lands somewhere they did not aim at.
+  if (fitBounds && line.length > 0) {
     map.fitBounds(leaflet.latLngBounds(line).pad(0.25));
   }
 

@@ -209,17 +209,15 @@ async function main() {
   //
   // PGlite takes seconds to boot from cold. Wiring the menu behind that await
   // leaves the burger button present but dead for the whole of it — a tap that
-  // does nothing, on the first tee, which is the exact moment QG2 is about. It
-  // navigates during boot; the router paints when it is ready.
+  // does nothing, on the first tee, which is the exact moment QG2 is about.
+  //
+  // The menu holds one item now. Navigation lives on the home screen, where a
+  // destination is one tap rather than two.
   if (toggle instanceof HTMLElement && panel instanceof HTMLElement) {
     createMenu({
       toggle,
       panel,
       handlers: {
-        'track-round': () => router.navigate('track'),
-        'plan-round': () => router.navigate('plan'),
-        'show-round': () => router.navigate('rounds'),
-        'manage-courses': () => router.navigate('courses'),
         'load-new-version': async () => {
           const outcome = await loadNewVersion(browserEnvironment());
           if (outcome.status !== 'reloading') {

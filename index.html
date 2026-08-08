@@ -429,6 +429,29 @@
         color: var(--muted);
       }
 
+      /* The planned distance for a stroke, right-aligned so the column of
+         numbers reads down the list rather than hiding behind club names. */
+      .row__distance {
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+        color: var(--ok);
+        font-weight: 600;
+      }
+
+      .row--total {
+        background: transparent;
+        border-style: dashed;
+        margin-bottom: 1rem;
+      }
+
+      .row--total:empty {
+        display: none;
+      }
+
+      .row--total .row__distance {
+        color: var(--text);
+      }
+
       .row__action {
         min-height: 3rem;
         padding: 0 0.875rem;
@@ -628,37 +651,16 @@
       </button>
 
       <!--
-        Reviewing and planning say that they need a network, because they do:
-        they are online capabilities (§1.4) and are not precached. Tracking a
-        round and managing courses carry no such warning, because they carry no
-        such dependency.
+        One item, deliberately.
+
+        The four destinations moved to the home screen, where they are tiles a
+        gloved thumb can hit without opening anything first. What is left here
+        is the one action that is not a destination: it does something to the
+        app rather than taking you somewhere in it, and it is rare enough that
+        burying it a tap deep is the point.
       -->
       <nav id="menu" class="menu" hidden aria-label="Main menu">
         <ul class="menu__list">
-          <li>
-            <button class="menu__item" type="button" data-action="track-round">
-              Track round
-              <span class="menu__hint">Capture strokes on the course. Works offline.</span>
-            </button>
-          </li>
-          <li>
-            <button class="menu__item" type="button" data-action="manage-courses">
-              Manage courses
-              <span class="menu__hint">Add a course and its tees. Works offline.</span>
-            </button>
-          </li>
-          <li>
-            <button class="menu__item" type="button" data-action="show-round">
-              Show round
-              <span class="menu__hint">Replay a round on the map. Needs a network.</span>
-            </button>
-          </li>
-          <li>
-            <button class="menu__item" type="button" data-action="plan-round">
-              Plan round
-              <span class="menu__hint">Place intended strokes on the map. Needs a network.</span>
-            </button>
-          </li>
           <li>
             <button class="menu__item" type="button" data-action="load-new-version">
               Load new version

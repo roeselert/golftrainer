@@ -12,6 +12,7 @@
  */
 
 import { CLUBS, clubName } from '../../offline/shared/domain/clubs.js';
+import { formatDistance, legDistances } from '../../offline/shared/domain/geo.js';
 import { listHoles, setTeePosition } from '../../offline/shared/catalogue/courses.js';
 import { renderCoursePicker } from '../../offline/shared/catalogue/course-picker.js';
 import {
@@ -84,6 +85,7 @@ async function renderHole(outlet, context, plan, number) {
   const container = el('div', { class: 'map', id: 'plan-map' });
   const attribution = el('p', { class: 'attribution' });
   const strokeList = el('ul', { class: 'list', id: 'plan-strokes' });
+  const planTotal = el('div', { class: 'row row--total', id: 'plan-total' });
 
   /** The club the next tap on the map will use. Driver, until told otherwise. */
   let selectedClub = CLUBS[0]?.id ?? 'DRIVER';
@@ -159,6 +161,7 @@ async function renderHole(outlet, context, plan, number) {
     container,
     attribution,
     strokeList,
+    planTotal,
     el('div', { class: 'hole-nav' }, [
       el('button', {
         class: 'action action--quiet',
@@ -240,12 +243,24 @@ async function renderHole(outlet, context, plan, number) {
     const hole = await holeOf(db, plan.id, number);
     if (!hole) return;
 
+    // How far each stroke is meant to carry: the first from the tee, the rest
+    // from where the previous one leaves the ball (BR10). This is the number
+    // that turns a plan from a shape into a club selection.
+    const legs = legDistances(hole.teePosition, hole.strokes);
+    /** @param {number} index */
+    const legLabel = (index) => formatDistance(legs[index] ?? null);
+
     if (layer) layer.remove();
     layer = drawHole(
       leaflet,
       map,
       hole,
-      (stroke) => `${stroke.sequence}. ${clubName(stroke.club)}`,
+      (stroke) => {
+        const distance = legLabel(stroke.sequence - 1);
+        return `${stroke.sequence}. ${clubName(stroke.club)}${distance ? ` · ${distance}` : ''}`;
+      },
+      // The golfer is aiming at the map; do not move it under them.
+      { fitBounds: false },
     );
 
     // Placed strokes are draggable, and dragging changes the position and
@@ -263,12 +278,45 @@ async function renderHole(outlet, context, plan, number) {
     }
 
     clear(strokeList);
-    for (const stroke of hole.strokes) {
+    hole.strokes.forEach((stroke, index) => {
+      const distance = legLabel(index);
       strokeList.append(
-        el('li', { class: 'row' }, [
+        el('li', { class: 'row', dataset: { sequence: String(stroke.sequence) } }, [
           el('span', { class: 'row__label', text: `${stroke.sequence}.` }),
           el('span', { class: 'row__detail', text: clubName(stroke.club) }),
+          el('span', {
+            class: 'row__distance',
+            // The first leg names the tee, because "212 m" on its own reads as
+            // a distance from the previous stroke, and for stroke 1 there is
+            // none. Without a tee position there is no first leg at all.
+            text: distance
+              ? index === 0
+                ? `${distance} from tee`
+                : distance
+              : index === 0
+                ? 'no tee position'
+                : '—',
+          }),
         ]),
+      );
+    });
+
+    // Outside the stroke list, because the total is not a stroke — putting it
+    // in the list would make "how many strokes are planned?" a question you
+    // have to subtract one from.
+    clear(planTotal);
+    if (hole.strokes.length > 0) {
+      const total = legs.reduce(
+        (sum, leg) => (sum === null || leg === null ? null : sum + leg),
+        /** @type {number | null} */ (0),
+      );
+      planTotal.append(
+        el('span', { class: 'row__label', text: 'Total' }),
+        el('span', {
+          class: 'row__detail',
+          text: `${hole.strokes.length} ${hole.strokes.length === 1 ? 'stroke' : 'strokes'} planned`,
+        }),
+        el('span', { class: 'row__distance', text: formatDistance(total) ?? '—' }),
       );
     }
   }

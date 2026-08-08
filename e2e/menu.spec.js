@@ -11,7 +11,7 @@ async function waitForServiceWorkerControl(page) {
   });
 }
 
-test('opens, closes, and offers five destinations', async ({ page }) => {
+test('opens, closes, and holds the one action that is not a destination', async ({ page }) => {
   await page.goto('index.html');
 
   const toggle = page.locator('#menu-toggle');
@@ -23,7 +23,8 @@ test('opens, closes, and offers five destinations', async ({ page }) => {
   await toggle.click();
   await expect(menu).toBeVisible();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(menu.locator('button[data-action]')).toHaveCount(5);
+  await expect(menu.locator('button[data-action]')).toHaveCount(1);
+  await expect(menu.locator('[data-action="load-new-version"]')).toBeVisible();
 
   // Escape closes and hands focus back, so the menu is escapable one-handed.
   await page.keyboard.press('Escape');
@@ -36,26 +37,19 @@ test('opens, closes, and offers five destinations', async ({ page }) => {
   await expect(menu).toBeHidden();
 });
 
-test('every destination is live, and the menu says which need a network', async ({ page }) => {
+test('the destinations live on the home screen, not behind the burger', async ({ page }) => {
   await page.goto('index.html');
-  await page.locator('#menu-toggle').click();
 
-  for (const action of [
-    'track-round',
-    'manage-courses',
-    'show-round',
-    'plan-round',
-    'load-new-version',
-  ]) {
-    await expect(page.locator(`[data-action="${action}"]`)).toBeEnabled();
+  // Four tiles, reachable in one tap rather than two.
+  for (const tile of ['tile-track', 'tile-courses', 'tile-rounds', 'tile-plan']) {
+    await expect(page.locator(`#${tile}`)).toBeVisible({ timeout: 30_000 });
   }
 
-  // The two online capabilities say so before they are tapped (§1.4). The two
-  // offline ones say the opposite, because it is the thing worth promising.
-  await expect(page.locator('[data-action="show-round"]')).toContainText('Needs a network');
-  await expect(page.locator('[data-action="plan-round"]')).toContainText('Needs a network');
-  await expect(page.locator('[data-action="track-round"]')).toContainText('Works offline');
-  await expect(page.locator('[data-action="manage-courses"]')).toContainText('Works offline');
+  await page.locator('#menu-toggle').click();
+  await expect(page.locator('#menu button[data-action]')).toHaveCount(1);
+  for (const gone of ['track-round', 'manage-courses', 'show-round', 'plan-round']) {
+    await expect(page.locator(`[data-action="${gone}"]`)).toHaveCount(0);
+  }
 });
 
 test('the menu works before the database has finished opening', async ({ page }) => {
@@ -66,10 +60,7 @@ test('the menu works before the database has finished opening', async ({ page })
 
   await page.locator('#menu-toggle').click();
   await expect(page.locator('#menu')).toBeVisible();
-  await page.locator('[data-action="manage-courses"]').click();
-
-  await expect(page).toHaveURL(/#\/courses/);
-  await expect(page.locator('#course-name')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-action="load-new-version"]')).toBeEnabled();
 });
 
 test('car mode: every menu target is big enough to hit with a glove on', async ({ page }) => {
