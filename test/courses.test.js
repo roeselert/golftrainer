@@ -9,6 +9,7 @@ import {
   listCourses,
   listHoles,
   renameCourse,
+  setHolePar,
   setTeePosition,
 } from '../src/offline/shared/catalogue/courses.js';
 import { migratedDatabase, positionAt } from './support/database.js';
@@ -140,6 +141,59 @@ test('renaming keeps the rounds attached, and still refuses a clash', async (t) 
     () => renameCourse(db, kaden.id, 'Treudelberg'),
     (error) => error instanceof CatalogueError && error.code === 'duplicate-name',
   );
+});
+
+test('AC9 — a hole has no par until the golfer sets one, and setting it is enough', async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const course = await addCourse(db, { name: 'Gut Kaden', holeCount: 9 });
+  assert.ok((await listHoles(db, course.id)).every((hole) => hole.par === null));
+
+  await setHolePar(db, course.id, 1, 4);
+  await setHolePar(db, course.id, 2, 3);
+  await setHolePar(db, course.id, 2, 5); // changed its mind; the hole keeps one par
+
+  const holes = await listHoles(db, course.id);
+  assert.equal(holes.find((hole) => hole.number === 1)?.par, 4);
+  assert.equal(holes.find((hole) => hole.number === 2)?.par, 5);
+  assert.equal(holes.filter((hole) => hole.par !== null).length, 2);
+});
+
+test('AC10 — a par can be cleared, and a par nobody plays is refused', async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const course = await addCourse(db, { name: 'Treudelberg', holeCount: 9 });
+  await setHolePar(db, course.id, 7, 5);
+  await setHolePar(db, course.id, 7, null);
+
+  const holes = await listHoles(db, course.id);
+  assert.equal(holes.find((hole) => hole.number === 7)?.par, null);
+
+  for (const par of [2, 7, 4.5]) {
+    await assert.rejects(
+      () => setHolePar(db, course.id, 7, par),
+      (error) => error instanceof CatalogueError && error.code === 'bad-par',
+    );
+  }
+});
+
+test("AC11 — a course's par is reported only once every hole has one", async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const course = await addCourse(db, { name: 'Wendlohe', holeCount: 9 });
+  for (const number of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    await setHolePar(db, course.id, number, 4);
+  }
+
+  // Eight of nine: a total of 32 next to a nine-hole round would read as the
+  // course's par, so there is none to report yet.
+  assert.equal((await listCourses(db))[0]?.par, null);
+
+  await setHolePar(db, course.id, 9, 3);
+  assert.equal((await listCourses(db))[0]?.par, 35);
 });
 
 test('the schema refuses a hole count nobody plays', async (t) => {

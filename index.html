@@ -452,6 +452,34 @@
         color: var(--text);
       }
 
+      /* A hole row carries more than it used to — tee state, par, and a capture
+         button — so it wraps rather than squeezing any of them off a phone. */
+      .row--hole {
+        flex-wrap: wrap;
+      }
+
+      .par-picker {
+        display: flex;
+        gap: 0.25rem;
+      }
+
+      .par {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        background: var(--surface);
+        color: var(--muted);
+        border: 1px solid #2b5039;
+        border-radius: 0.625rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .par--on {
+        background: #24503a;
+        color: var(--text);
+        outline: 2px solid var(--ok);
+      }
+
       .row__action {
         min-height: 3rem;
         padding: 0 0.875rem;
@@ -609,6 +637,19 @@
       .table th {
         color: var(--muted);
         font-weight: 600;
+      }
+
+      .table__distance {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      /* The round's totals. Set apart from the per-hole rows, because a column
+         of eighteen numbers and their sum should not read as nineteen holes. */
+      .table tfoot td {
+        font-weight: 700;
+        border-top: 2px solid #3f7d5a;
+        border-bottom: none;
       }
 
       .scroll-x {

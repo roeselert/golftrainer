@@ -163,7 +163,7 @@ flowchart TB
 
         subgraph shared["Shared foundation"]
             domain["Domain Model<br/><i>rounds · holes · strokes · positions</i>"]
-            course["Course Catalogue<br/><i>owns: courses, holes, tees, greens</i>"]
+            course["Course Catalogue<br/><i>owns: courses, holes, tees, par</i>"]
             store["Local Store<br/><i>persistence — PGlite</i>"]
         end
     end
@@ -442,6 +442,12 @@ on the course.
   round-hole row on arrival, so walking to the eighteenth tee and quitting left
   a round containing a hole nobody played — counted in every total downstream.
   Hole rows are now created by the first write to them.
+- **And then a map with nothing on it, because of that fix.** The planner asks
+  the store for the hole it is drawing, and a hole nobody has planned yet has no
+  row — so the redraw returned early and the golfer opened an empty basemap. The
+  tee is known before any of that: it comes from the catalogue, not from the
+  round. The planner now draws it from the moment the screen opens, and the
+  round-hole row is still created by the first stroke placed (UC3 BR11).
 - **A home-screen icon with an alpha channel.** iOS composites transparency in
   an `apple-touch-icon` onto black, so a corner the artwork failed to cover
   becomes a black corner on the home screen — on the one platform TD8 exists
@@ -482,6 +488,15 @@ on the course.
   a course is usable with no tee positions at all. No provider, no import, so
   the Course Catalogue keeps its place in the offline shared foundation with
   nothing to fetch. Specified in [UC5](docs/use%20cases/UC5-manage-courses.md).
+- **Par** — a nullable column on `CourseHole`, entered by the golfer three taps
+  at a time (UC5 BR9). It follows the tee position exactly: optional forever, so
+  a course is still usable the minute it is named, and unknown rather than
+  guessed when nobody has set it. The review screen totals it over the holes
+  that have one and says how many that was, because a par summed over half a
+  round is a number that looks like a par. Nothing derives from it and nothing
+  copies it onto a round, so a par entered weeks after a round still describes
+  the hole that was played (UC2 BR9). This was the "should a course record more
+  than tees?" question in UC5; green centres and stroke index remain unasked.
 - **OPEN-8 — which clubs** — a fixed bag of twelve: driver, irons 4–9, four
   wedges, putter. Not configurable, no woods, no hybrids. Twelve is a car-mode
   layout decision (QG2) before it is a data one — three across and four down

@@ -34,6 +34,7 @@
  * @property {number} number
  * @property {Date | null} finishedAt
  * @property {number | null} putts
+ * @property {number | null} par        From the catalogue, null when unknown (UC5 BR9)
  * @property {Position | null} teePosition
  * @property {Stroke[]} strokes
  */
@@ -274,7 +275,7 @@ export async function finishRound(db, roundId) {
  */
 export async function holesOf(db, roundId) {
   const { rows: holeRows } = await db.query(
-    `SELECT h.id, h.number, h.finished_at, h.putts,
+    `SELECT h.id, h.number, h.finished_at, h.putts, ch.par,
             ch.tee_latitude, ch.tee_longitude, ch.tee_accuracy, ch.tee_fixed_at
        FROM round_holes h
        JOIN rounds r ON r.id = h.round_id
@@ -311,6 +312,10 @@ export async function holesOf(db, roundId) {
     number: Number(row.number),
     finishedAt: row.finished_at === null ? null : new Date(row.finished_at),
     putts: row.putts === null ? null : Number(row.putts),
+    // Read live from the catalogue rather than copied onto the round: a par
+    // entered after the round was played still describes the hole that was
+    // played, and copying it would mean two answers to one question.
+    par: row.par === null || row.par === undefined ? null : Number(row.par),
     teePosition: toPosition(row, 'tee_'),
     strokes: byHole.get(row.id) ?? [],
   }));

@@ -36,8 +36,10 @@
 2. The system lists the stored courses.
 3. The golfer taps a course. The system opens a round with `kind = PLANNED` and
    `startedAt = now`, and proposes hole 1.
-4. The golfer taps **Start hole**. The system opens the hole and centres the map
-   on that hole's tee position.
+4. The golfer taps **Start hole**. The system centres the map on that hole's tee
+   position and **marks the tee** as the point the plan starts from (BR11),
+   before anything has been placed. The hole itself is opened by the first
+   stroke, not by arriving at the screen.
 5. The golfer taps the map where they intend the ball to come to rest, then
    picks the club they intend to use.
 6. The system appends the stroke — the tapped coordinates as its position, no
@@ -87,6 +89,7 @@ sequenceDiagram
         S->>M: centre on tee
         M->>T: tiles
         T-->>M: tiles
+        M-->>G: tee marked as the starting point
         loop each intended stroke
             G->>M: tap the target spot
             M-->>G: club picker
@@ -146,16 +149,17 @@ The `RoundHole` survives; its strokes do not.
 | BR8  | The club picker offers the same twelve clubs as the capture grid (UC1 BR11), from the same enumeration. It need not use the same layout — there is no glove and no group waiting here                                                                                                                                                                                                                                          |
 | BR9  | A plan contains no penalty strokes. A penalty is a second stroke at the same position (UC1 A6), which is a thing that happens, not a thing anyone intends. Nothing forbids placing two strokes on one spot; it is simply never the point of a plan                                                                                                                                                                             |
 | BR10 | **Every planned stroke shows the distance it has to carry**, in metres: the first measured from the hole's tee position, each later one from the stroke before it. This is the same "where the ball came to rest" chain the model rests on (UC1 BR1). Without a tee position the first leg is unknown and says so rather than measuring from the wrong end; a stroke with no position breaks the chain rather than bridging it |
+| BR11 | **The tee is drawn as the plan's starting point, from the moment the hole opens.** It is labelled without hovering, because it is the point every distance in BR10 is measured from. It comes from the Course Catalogue rather than the round, so it is known before the golfer has planned anything — an empty hole is a map with a tee on it, never an empty basemap                                                         |
 
 ## 6. Data requirements
 
-| Entity       | This use case                                                      |
-| ------------ | ------------------------------------------------------------------ |
-| `Course`     | Reads                                                              |
-| `CourseHole` | Reads; writes `teePosition` only via A2, which delegates to UC5    |
-| `Round`      | Creates, with `kind = PLANNED`                                     |
-| `RoundHole`  | Creates one per hole planned; writes intended `putts`              |
-| `Stroke`     | Creates, updates and deletes — unlike UC1, which only ever appends |
+| Entity       | This use case                                                                           |
+| ------------ | --------------------------------------------------------------------------------------- |
+| `Course`     | Reads                                                                                   |
+| `CourseHole` | Reads `teePosition` and `par`; writes `teePosition` only via A2, which delegates to UC5 |
+| `Round`      | Creates, with `kind = PLANNED`                                                          |
+| `RoundHole`  | Creates one per hole planned; writes intended `putts`                                   |
+| `Stroke`     | Creates, updates and deletes — unlike UC1, which only ever appends                      |
 
 ## 7. Acceptance criteria
 
@@ -202,6 +206,12 @@ _then_ the distance shown changes to match.
 _Given_ the whole of `src/online/` is deleted,
 _when_ the build and the offline suite run,
 _then_ both pass.
+
+**AC9 — The tee is on the map before the plan is**
+_Given_ hole 1 has a tee position and nothing has been planned on it,
+_when_ the golfer opens it in the planner,
+_then_ the tee is drawn and labelled as the hole's starting point, and the hole
+still has no stored strokes.
 
 ## 8. Open questions
 

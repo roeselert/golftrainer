@@ -122,6 +122,98 @@ test('UC2 AC3 — a stroke with no position keeps its row and says so', async ({
   await expect(page.locator('.notice--warn')).toContainText('no position on this hole');
 });
 
+test('UC2 AC8 — the overview carries par per hole and totals the round', async ({ page }) => {
+  await captureRound(page);
+
+  // Par is entered in the catalogue, after the round was played — which is the
+  // ordinary case, since nothing asks for it before the first tee (UC5 BR9).
+  await page.goto('index.html#/courses');
+  await page.locator('#course-list [data-course]').first().click();
+  await expect(page.locator('#course-par')).toContainText('0 of 18 pars set');
+  await page.locator('#hole-list [data-hole="1"] [data-par="4"]').click();
+  await expect(page.locator('#course-par')).toContainText('1 of 18 pars set');
+  await expect(page.locator('#hole-list [data-hole="1"] [data-par="4"]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.goto('index.html#/rounds');
+  await page.locator('#round-list [data-round]').first().click();
+
+  const played = page.locator('#overview-table tbody tr[data-hole="1"] td');
+  await expect(played.nth(1)).toHaveText('4');
+
+  // Hole · Par · Strokes · Putts · Total, summed over the holes this round
+  // recorded — one of them, and it has a par, so the total is a whole one.
+  const totals = page.locator('#overview-table tfoot tr td');
+  await expect(totals.nth(0)).toHaveText('Total');
+  await expect(totals.nth(1)).toHaveText('4');
+  await expect(totals.nth(2)).toHaveText('2');
+  await expect(totals.nth(3)).toHaveText('2');
+  await expect(totals.nth(4)).toHaveText('4');
+
+  // Tapping the same par again clears it, and the overview goes back to saying
+  // it does not know rather than keeping the number.
+  await page.goto('index.html#/courses');
+  await page.locator('#course-list [data-course]').first().click();
+  await page.locator('#hole-list [data-hole="1"] [data-par="4"]').click();
+  await expect(page.locator('#course-par')).toContainText('0 of 18 pars set');
+
+  await page.goto('index.html#/rounds');
+  await page.locator('#round-list [data-round]').first().click();
+  await expect(page.locator('#overview-table tbody tr[data-hole="1"] td').nth(1)).toHaveText('—');
+  await expect(page.locator('#overview-table tfoot tr td').nth(0)).toContainText('par over 0 of 1');
+  await expect(page.locator('#overview-table tfoot tr td').nth(1)).toHaveText('—');
+});
+
+test('UC2 AC9 — every stroke shows how far it travelled', async ({ page }) => {
+  await captureRound(page);
+
+  await page.goto('index.html#/rounds');
+  await page.locator('#round-list [data-round]').first().click();
+
+  // The tee was captured where the drive was recorded, so the first leg is
+  // roughly nothing; the golfer then walked ~500 m to play the second.
+  const first = page.locator('#stroke-table tbody tr[data-sequence="1"] td').nth(3);
+  const second = page.locator('#stroke-table tbody tr[data-sequence="2"] td').nth(3);
+
+  await expect(first).toHaveText(/^\d+ m$/);
+  await expect(second).toHaveText(/^\d+ m$/);
+
+  /** @param {string | null} text */
+  const metres = (text) => Number((text ?? '').replace(/[^0-9.]/g, ''));
+  expect(metres(await first.textContent())).toBeLessThan(20);
+  expect(metres(await second.textContent())).toBeGreaterThan(100);
+});
+
+test('UC3 BR11 — the tee is marked as the starting point before anything is placed', async ({
+  page,
+}) => {
+  await page.goto('index.html#/courses');
+  await page.locator('#course-name').fill('Gut Kaden');
+  await page.locator('#add-18').click();
+  await page.locator('[data-capture-tee="1"]').click();
+  await expect(page.locator('.notice--ok')).toBeVisible();
+  await page.locator('#hole-list [data-hole="1"] [data-par="3"]').click();
+
+  await page.goto('index.html#/plan');
+  await page.locator('#plan-course-choice [data-course]').first().click();
+  await expect(page.locator('#plan-map')).toBeVisible();
+
+  // Nothing is planned yet, and the map still shows where the hole starts.
+  await expect(page.locator('#plan-strokes li')).toHaveCount(0);
+  await expect(page.locator('#plan-map .leaflet-tooltip')).toBeVisible();
+  await expect(page.locator('#plan-map')).toContainText('starts here');
+
+  // And the plan says what it is being measured against.
+  await expect(page.locator('.screen__subtitle')).toContainText('par 3');
+
+  // The marker stays the starting point once strokes are placed on top of it.
+  await page.locator('#plan-map').click({ position: { x: 240, y: 140 } });
+  await expect(page.locator('#plan-strokes li')).toHaveCount(1);
+  await expect(page.locator('#plan-map')).toContainText('starts here');
+});
+
 test('UC3 AC1/AC2 — a hole is planned on the map, and stored as a plan', async ({ page }) => {
   await page.goto('index.html#/courses');
   await page.locator('#course-name').fill('Gut Kaden');
@@ -154,7 +246,9 @@ test('UC3 AC1/AC2 — a hole is planned on the map, and stored as a plan', async
 
   const rows = page.locator('#stroke-table tbody tr');
   await expect(rows).toHaveCount(2);
-  await expect(rows.first().locator('td').nth(4)).toHaveText('');
+  // Hole · # · Club · Distance · Position · Accuracy — and a planned stroke's
+  // accuracy is blank rather than zero (BR2).
+  await expect(rows.first().locator('td').nth(5)).toHaveText('');
 });
 
 test('UC3 AC5 — a hole with no tee asks for one and writes it to the catalogue', async ({

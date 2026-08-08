@@ -10,10 +10,19 @@
  * round would mean walking the course twice.
  */
 
+/**
+ * The pars a hole is offered on the catalogue screen (UC5 BR9).
+ *
+ * Three buttons, like the two hole-count buttons: par is chosen, never typed.
+ * The schema allows 6 as well, because par-6 holes exist; nothing in the UI
+ * offers one until a golfer asks for it.
+ */
+export const HOLE_PARS = /** @type {const} */ ([3, 4, 5]);
+
 /** Raised for the refusals UC5 specifies, so a view can explain rather than crash. */
 export class CatalogueError extends Error {
   /**
-   * @param {'duplicate-name' | 'empty-name' | 'course-in-use' | 'unknown-course'} code
+   * @param {'duplicate-name' | 'empty-name' | 'course-in-use' | 'unknown-course' | 'bad-par'} code
    * @param {string} message  Shown to the golfer as-is.
    */
   constructor(code, message) {
@@ -32,11 +41,12 @@ export class CatalogueError extends Error {
  * @property {number} holeCount
  * @property {Date} createdAt
  *
- * @typedef {Course & { teeCount: number, roundCount: number }} CourseSummary
+ * @typedef {Course & { teeCount: number, roundCount: number, par: number | null }} CourseSummary
  *
  * @typedef {object} CourseHole
  * @property {string} id
  * @property {number} number
+ * @property {number | null} par         Null until the golfer sets it (UC5 BR9)
  * @property {Position | null} teePosition
  */
 
@@ -61,6 +71,7 @@ function toHole(row) {
   return {
     id: row.id,
     number: Number(row.number),
+    par: row.par === null || row.par === undefined ? null : Number(row.par),
     teePosition:
       row.tee_latitude === null || row.tee_latitude === undefined
         ? null
@@ -88,6 +99,11 @@ export async function listCourses(db) {
            c.created_at,
            (SELECT count(*) FROM course_holes h
              WHERE h.course_id = c.id AND h.tee_latitude IS NOT NULL) AS tee_count,
+           -- The course's par, and only once every hole has one. A total over
+           -- half the holes is a smaller number that looks like a par, which is
+           -- worse than saying nothing (UC5 BR9).
+           (SELECT CASE WHEN count(*) FILTER (WHERE h.par IS NULL) = 0 THEN sum(h.par) END
+              FROM course_holes h WHERE h.course_id = c.id)            AS par,
            (SELECT count(*) FROM rounds r WHERE r.course_id = c.id)   AS round_count,
            (SELECT max(r.started_at) FROM rounds r WHERE r.course_id = c.id) AS last_played
       FROM courses c
@@ -101,6 +117,7 @@ export async function listCourses(db) {
     ...toCourse(row),
     teeCount: Number(row.tee_count),
     roundCount: Number(row.round_count),
+    par: row.par === null || row.par === undefined ? null : Number(row.par),
   }));
 }
 
@@ -200,6 +217,32 @@ export async function setTeePosition(db, courseId, number, position) {
       position.fixedAt?.toISOString() ?? null,
     ],
   );
+}
+
+/**
+ * Writes a hole's par, or clears it (UC5 A7).
+ *
+ * Clearing is a real operation rather than an oversight: a par tapped by
+ * mistake has to be removable, and "no par" is a value this model already
+ * carries everywhere. Nothing derived from par is stored, so setting it later
+ * changes every screen that reads it and rewrites nothing.
+ *
+ * @param {any} db
+ * @param {string} courseId
+ * @param {number} number
+ * @param {number | null} par  3..6, or null to clear
+ * @returns {Promise<void>}
+ */
+export async function setHolePar(db, courseId, number, par) {
+  if (par !== null && !(Number.isInteger(par) && par >= 3 && par <= 6)) {
+    throw new CatalogueError('bad-par', `${par} is not a par a hole can have.`);
+  }
+
+  await db.query('UPDATE course_holes SET par = $3 WHERE course_id = $1 AND number = $2', [
+    courseId,
+    number,
+    par,
+  ]);
 }
 
 /**
