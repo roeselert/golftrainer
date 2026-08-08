@@ -23,6 +23,7 @@
     "src/offline/shared/store/database.js",
     "src/offline/shared/store/migrations.js",
     "src/offline/shared/store/migrations/001-domain.js",
+    "src/offline/shared/store/migrations/002-hole-par.js",
     "src/offline/shared/store/migrations/index.js",
     "src/shell/app-update.js",
     "src/shell/dom.js",

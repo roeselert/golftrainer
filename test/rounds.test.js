@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { addCourse, setTeePosition } from '../src/offline/shared/catalogue/courses.js';
+import { addCourse, setHolePar, setTeePosition } from '../src/offline/shared/catalogue/courses.js';
 import {
   RoundError,
   appendStroke,
@@ -240,6 +240,24 @@ test('a hole carries the tee position of the course hole it corresponds to', asy
 
   const hole = await holeOf(db, roundId, 1);
   assert.equal(hole?.teePosition?.latitude, 53.69);
+});
+
+test('a hole carries the par of the course hole, including one set afterwards', async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const { courseId, roundId } = await startedRound(db);
+  await openHole(db, roundId, 1);
+  await openHole(db, roundId, 2);
+
+  // Nothing forces a par to exist before the round: the golfer may add it
+  // weeks later, and it still describes the hole they played (UC2 BR9).
+  assert.equal((await holeOf(db, roundId, 1))?.par, null);
+
+  await setHolePar(db, courseId, 1, 5);
+  const holes = await holesOf(db, roundId);
+  assert.equal(holes.find((hole) => hole.number === 1)?.par, 5);
+  assert.equal(holes.find((hole) => hole.number === 2)?.par, null);
 });
 
 test('UC3 — a placed stroke moves without changing its sequence or club', async (t) => {

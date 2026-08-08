@@ -11,12 +11,14 @@
 import { clear, describeError, el, notice, screenHeader } from '../../../shell/dom.js';
 import { currentFix, describeAccuracy } from '../../positioning/positioning.js';
 import {
+  HOLE_PARS,
   addCourse,
   courseById,
   deleteCourse,
   listCourses,
   listHoles,
   renameCourse,
+  setHolePar,
   setTeePosition,
 } from './courses.js';
 
@@ -117,6 +119,9 @@ async function renderList(outlet, context) {
                     class: 'list__detail',
                     text:
                       `${course.holeCount} holes · ${course.teeCount} of ${course.holeCount} tees known` +
+                      // Only once every hole has one: a par summed over half a
+                      // course is a number that looks like a par (UC5 BR9).
+                      (course.par === null ? '' : ` · par ${course.par}`) +
                       (course.roundCount > 0
                         ? ` · ${course.roundCount} ${course.roundCount === 1 ? 'round' : 'rounds'}`
                         : ''),
@@ -152,13 +157,22 @@ async function renderCourse(outlet, context, courseId) {
 
   const messages = el('div', { class: 'messages' });
   const holesList = el('ul', { class: 'list', id: 'hole-list' });
+  const parSummary = el('p', { class: 'tally', id: 'course-par' });
 
   async function paintHoles() {
     const holes = await listHoles(db, courseId);
+    const known = holes.filter((hole) => hole.par !== null);
+    const total = known.reduce((sum, hole) => sum + (hole.par ?? 0), 0);
+
+    parSummary.textContent =
+      known.length === holes.length
+        ? `Par ${total}`
+        : `${known.length} of ${holes.length} pars set${known.length > 0 ? ` · ${total} so far` : ''}`;
+
     clear(holesList);
     for (const hole of holes) {
       holesList.append(
-        el('li', { class: 'row' }, [
+        el('li', { class: 'row row--hole', dataset: { hole: String(hole.number) } }, [
           el('span', { class: 'row__label', text: `Hole ${hole.number}` }),
           el('span', {
             class: `row__detail${hole.teePosition ? '' : ' row__detail--muted'}`,
@@ -166,6 +180,22 @@ async function renderCourse(outlet, context, courseId) {
               ? `Tee set · ${describeAccuracy(hole.teePosition)}`
               : 'No tee position',
           }),
+          el(
+            'div',
+            { class: 'par-picker', role: 'group', 'aria-label': `Par for hole ${hole.number}` },
+            HOLE_PARS.map((par) =>
+              el('button', {
+                class: `par${hole.par === par ? ' par--on' : ''}`,
+                type: 'button',
+                dataset: { par: String(par) },
+                'aria-pressed': String(hole.par === par),
+                text: String(par),
+                // Tapping the par already set clears it. A par is three taps
+                // away from being wrong and there is nowhere else to undo it.
+                onclick: () => void setPar(hole.number, hole.par === par ? null : par),
+              }),
+            ),
+          ),
           el('button', {
             class: 'row__action',
             type: 'button',
@@ -175,6 +205,20 @@ async function renderCourse(outlet, context, courseId) {
           }),
         ]),
       );
+    }
+  }
+
+  /**
+   * @param {number} number
+   * @param {number | null} par
+   */
+  async function setPar(number, par) {
+    clear(messages);
+    try {
+      await setHolePar(db, courseId, number, par);
+      await paintHoles();
+    } catch (error) {
+      messages.append(notice('fail', `Could not store the par: ${describeError(error)}`));
     }
   }
 
@@ -253,11 +297,12 @@ async function renderCourse(outlet, context, courseId) {
         }),
       ]),
     ]),
-    el('h3', { class: 'card__title', text: 'Tee positions' }),
+    el('h3', { class: 'card__title', text: 'Holes' }),
     el('p', {
       class: 'hint',
-      text: 'Stand on the tee and capture it, or place them all on a map from home. The course works without any of these.',
+      text: 'Tap a par to set it, and tap it again to clear it. Stand on a tee and capture it, or place them all on a map from home. The course works without any of these.',
     }),
+    parSummary,
     // Navigation, not an import: the map screen is an online capability and
     // this file is in the offline core (§1.4). Tapping it loads that screen;
     // being offline refuses it at the door, with the course still usable here.

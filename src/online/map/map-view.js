@@ -150,9 +150,17 @@ export async function createMap(container, { centre, zoom = 16, onTrouble }) {
  * @param {(stroke: any) => string} label
  * @param {object} [options]
  * @param {boolean} [options.fitBounds] Re-frame the map around the hole.
+ * @param {string} [options.teeLabel] What the tee marker is called.
+ * @param {boolean} [options.permanentTee] Show the tee label without hovering.
  * @returns {any} the layer group, so the caller can remove it
  */
-export function drawHole(leaflet, map, hole, label, { fitBounds = true } = {}) {
+export function drawHole(
+  leaflet,
+  map,
+  hole,
+  label,
+  { fitBounds = true, teeLabel = 'Tee', permanentTee = false } = {},
+) {
   const group = leaflet.layerGroup().addTo(map);
   const positioned = hole.strokes.filter((stroke) => stroke.position !== null);
 
@@ -167,7 +175,10 @@ export function drawHole(leaflet, map, hole, label, { fitBounds = true } = {}) {
         fillColor: '#4ade80',
         fillOpacity: 1,
       })
-      .bindTooltip('Tee', { permanent: false })
+      // Permanent when the golfer is planning: the tee is the point every
+      // distance is measured from, and a label you have to hover to find is
+      // not a starting point (UC3 BR11).
+      .bindTooltip(teeLabel, { permanent: permanentTee, direction: 'top' })
       .addTo(group);
   }
 

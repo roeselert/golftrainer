@@ -11,5 +11,6 @@
  * @type {readonly import('../migrations.js').Migration[]}
  */
 import { domainSchema } from './001-domain.js';
+import { holePar } from './002-hole-par.js';
 
-export const migrations = [domainSchema];
+export const migrations = [domainSchema, holePar];

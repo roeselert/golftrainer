@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { PGlite } from '../vendor/pglite/index.js';
 import { currentVersion, migrate } from '../src/offline/shared/store/migrations.js';
+import { domainSchema } from '../src/offline/shared/store/migrations/001-domain.js';
+import { migrations } from '../src/offline/shared/store/migrations/index.js';
 
 /** @returns {Promise<PGlite>} an isolated in-memory database */
 function freshDatabase() {
@@ -98,6 +100,24 @@ test('a failing migration leaves the database at the previous version', async (t
   // interrupted mid-flight would leave a half-built schema behind.
   const { rows } = await db.query("SELECT to_regclass('public.rounds') IS NOT NULL AS present");
   assert.equal(rows[0].present, false, 'a failed migration must not leave its tables behind');
+});
+
+test('UC5 AC8 — a course stored under the first schema survives the par migration', async (t) => {
+  const db = await freshDatabase();
+  t.after(() => db.close());
+
+  // Exactly what a device that installed the app before par existed has.
+  await migrate(db, [domainSchema]);
+  const { rows } = await db.query(
+    "INSERT INTO courses (name, hole_count) VALUES ('Gut Kaden', 9) RETURNING id",
+  );
+  await db.query('INSERT INTO course_holes (course_id, number) VALUES ($1, 1)', [rows[0].id]);
+
+  assert.deepEqual(await migrate(db, migrations), [2]);
+
+  const holes = await db.query('SELECT number, par FROM course_holes');
+  assert.equal(holes.rows.length, 1, 'the upgrade must not lose a hole');
+  assert.equal(holes.rows[0].par, null, 'an unknown par stays unknown, it is not invented');
 });
 
 test('rejects duplicate versions', async (t) => {

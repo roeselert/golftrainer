@@ -117,7 +117,10 @@ async function renderHole(outlet, context, plan, number) {
   outlet.append(
     screenHeader({
       title: `Plan hole ${number}`,
-      subtitle: plan.courseName,
+      // Par is what a plan is measured against — three strokes and two putts is
+      // a good plan for a par 5 and a poor one for a par 3. Absent until the
+      // golfer sets it in the catalogue (UC5 BR9), and silent when it is.
+      subtitle: teeHole?.par ? `${plan.courseName} · par ${teeHole.par}` : plan.courseName,
       onBack: () => navigate('plan', { round: plan.id }),
     }),
     messages,
@@ -218,14 +221,15 @@ async function renderHole(outlet, context, plan, number) {
     }),
   );
 
+  // Bound once, past the guard above: from here on the hole has a tee, and it
+  // is both where the map opens and where the plan's first leg is measured from.
+  const tee = teeHole.teePosition;
+
   /** @type {any} */ let map;
   /** @type {any} */ let leaflet;
   try {
     const created = await createMap(container, {
-      centre: {
-        latitude: teeHole.teePosition.latitude,
-        longitude: teeHole.teePosition.longitude,
-      },
+      centre: { latitude: tee.latitude, longitude: tee.longitude },
       zoom: 16,
       onTrouble: (message) => messages.append(notice('warn', message)),
     });
@@ -240,15 +244,22 @@ async function renderHole(outlet, context, plan, number) {
   /** @type {any} */ let layer;
 
   async function repaint() {
-    const hole = await holeOf(db, plan.id, number);
-    if (!hole) return;
+    // A hole with nothing placed on it yet has no `round_holes` row — it is
+    // created by the first stroke, not by looking at the hole. That is not an
+    // empty map: the tee is known, and it is where the plan starts (BR11).
+    const hole = (await holeOf(db, plan.id, number)) ?? {
+      number,
+      putts: null,
+      teePosition: tee,
+      strokes: [],
+    };
 
     // How far each stroke is meant to carry: the first from the tee, the rest
     // from where the previous one leaves the ball (BR10). This is the number
     // that turns a plan from a shape into a club selection.
     const legs = legDistances(hole.teePosition, hole.strokes);
     /** @param {number} index */
-    const legLabel = (index) => formatDistance(legs[index] ?? null);
+    const legLabel = (index) => formatDistance(legs.at(index) ?? null);
 
     if (layer) layer.remove();
     layer = drawHole(
@@ -259,8 +270,12 @@ async function renderHole(outlet, context, plan, number) {
         const distance = legLabel(stroke.sequence - 1);
         return `${stroke.sequence}. ${clubName(stroke.club)}${distance ? ` · ${distance}` : ''}`;
       },
-      // The golfer is aiming at the map; do not move it under them.
-      { fitBounds: false },
+      {
+        // The golfer is aiming at the map; do not move it under them.
+        fitBounds: false,
+        teeLabel: `Tee · hole ${number} starts here`,
+        permanentTee: true,
+      },
     );
 
     // Placed strokes are draggable, and dragging changes the position and

@@ -12,6 +12,7 @@
  */
 
 import { clubName } from '../../offline/shared/domain/clubs.js';
+import { formatDistance, legDistances } from '../../offline/shared/domain/geo.js';
 import { describeAccuracy } from '../../offline/positioning/positioning.js';
 import { holeTotal, holesOf, listRounds, roundById } from '../../offline/shared/rounds/rounds.js';
 import {
@@ -137,6 +138,15 @@ async function renderRound(outlet, context, roundId) {
  * @returns {HTMLElement}
  */
 function overviewSection(holes) {
+  // Par comes from the catalogue and is optional there (UC5 BR9), so a round
+  // may be played over holes with no par at all. The total is summed over the
+  // holes that have one and says how many that was — a par of 12 next to a
+  // score of 84 is worse than no par at all.
+  const scored = holes.filter((/** @type {any} */ hole) => hole.par !== null);
+  const parTotal = scored.reduce((sum, hole) => sum + hole.par, 0);
+  const strokes = holes.reduce((sum, hole) => sum + hole.strokes.length, 0);
+  const putts = holes.reduce((sum, hole) => sum + (hole.putts ?? 0), 0);
+
   return el('section', {}, [
     el('h3', { class: 'card__title', text: 'Overview' }),
     el('div', { class: 'scroll-x' }, [
@@ -144,6 +154,7 @@ function overviewSection(holes) {
         el('thead', {}, [
           el('tr', {}, [
             el('th', { text: 'Hole' }),
+            el('th', { text: 'Par' }),
             el('th', { text: 'Strokes' }),
             el('th', { text: 'Putts' }),
             el('th', { text: 'Total' }),
@@ -155,6 +166,7 @@ function overviewSection(holes) {
           holes.map((hole) =>
             el('tr', { dataset: { hole: String(hole.number) } }, [
               el('td', { text: String(hole.number) }),
+              el('td', { text: hole.par === null ? '—' : String(hole.par) }),
               el('td', {
                 // A hole played with no strokes recorded is shown as such, not
                 // as a zero (UC1 A5, UC2 E6).
@@ -165,6 +177,20 @@ function overviewSection(holes) {
             ]),
           ),
         ),
+        el('tfoot', {}, [
+          el('tr', { dataset: { total: 'round' } }, [
+            el('td', {
+              text:
+                scored.length === holes.length
+                  ? 'Total'
+                  : `Total (par over ${scored.length} of ${holes.length})`,
+            }),
+            el('td', { text: scored.length === 0 ? '—' : String(parTotal) }),
+            el('td', { text: String(strokes) }),
+            el('td', { text: String(putts) }),
+            el('td', { text: String(strokes + putts) }),
+          ]),
+        ]),
       ]),
     ]),
   ]);
@@ -181,12 +207,25 @@ function overviewSection(holes) {
 function tableSection(holes, round) {
   const rows = [];
   for (const hole of holes) {
-    for (const stroke of hole.strokes) {
+    // How far each stroke actually travelled: the first from the tee, the rest
+    // from where the previous one left the ball — the same chain the planner
+    // shows as an intention (UC3 BR10). A missing position breaks the chain
+    // rather than bridging it, so the legs either side of it are unknown.
+    const legs = legDistances(hole.teePosition, hole.strokes);
+
+    for (const [index, stroke] of hole.strokes.entries()) {
       rows.push(
         el('tr', { dataset: { hole: String(hole.number), sequence: String(stroke.sequence) } }, [
           el('td', { text: String(hole.number) }),
           el('td', { text: String(stroke.sequence) }),
           el('td', { text: clubName(stroke.club) }),
+          el('td', {
+            class: 'table__distance',
+            // "—" covers three different unknowns — no tee, no position on this
+            // stroke, none on the one before — and each of them is already
+            // stated in the position column of the row it belongs to.
+            text: formatDistance(legs.at(index) ?? null) ?? '—',
+          }),
           el('td', {
             text: stroke.position
               ? `${formatCoordinate(stroke.position.latitude)}, ${formatCoordinate(stroke.position.longitude)}`
@@ -211,6 +250,7 @@ function tableSection(holes, round) {
             el('th', { text: 'Hole' }),
             el('th', { text: '#' }),
             el('th', { text: 'Club' }),
+            el('th', { text: 'Distance' }),
             el('th', { text: 'Position' }),
             el('th', { text: 'Accuracy' }),
           ]),
