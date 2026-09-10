@@ -100,6 +100,32 @@ test('AC6 — a course with rounds cannot be deleted, and the refusal counts the
   assert.equal(Number(rows[0].n), 2);
 });
 
+test('UC5 A9 — the course and its rounds go together when the golfer says so', async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const course = await addCourse(db, { name: 'Treudelberg', holeCount: 18 });
+  const other = await addCourse(db, { name: 'Wendlohe', holeCount: 9 });
+  await db.query(`INSERT INTO rounds (course_id, kind) VALUES ($1, 'PLAYED'), ($1, 'PLANNED')`, [
+    course.id,
+  ]);
+  await db.query(`INSERT INTO rounds (course_id, kind) VALUES ($1, 'PLAYED')`, [other.id]);
+
+  assert.equal(await deleteCourse(db, course.id, { withRounds: true }), 2);
+
+  // Gone: the course, its holes and its rounds. Untouched: everything that
+  // belongs to another course.
+  assert.deepEqual(
+    (await listCourses(db)).map((summary) => summary.name),
+    ['Wendlohe'],
+  );
+  const { rows } = await db.query(
+    'SELECT (SELECT count(*) FROM rounds) AS rounds, (SELECT count(*) FROM course_holes) AS holes',
+  );
+  assert.equal(Number(rows[0].rounds), 1);
+  assert.equal(Number(rows[0].holes), 9);
+});
+
 test('a course with no rounds is deleted, and takes its holes with it', async (t) => {
   const db = await migratedDatabase();
   t.after(() => db.close());

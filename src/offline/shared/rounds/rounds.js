@@ -333,22 +333,30 @@ export async function holeOf(db, roundId, number) {
 }
 
 /**
- * Rounds for the list screen, newest first, played and planned together (UC2).
+ * Rounds for the list screens, newest first, played and planned together (UC2).
+ *
+ * The optional course narrows the same list to one course, which is what the
+ * catalogue screen shows before it offers to delete any of them (UC5 A8). One
+ * query rather than two: a round summarised on the review screen and the same
+ * round summarised beside its course must not be able to disagree.
  *
  * @param {any} db
+ * @param {string | null} [courseId]  Every round when omitted; one course's when given
  * @returns {Promise<(Round & { strokeCount: number, putts: number, holeCount: number })[]>}
  */
-export async function listRounds(db) {
-  const { rows } = await db.query(`
-    SELECT ${ROUND_COLUMNS},
+export async function listRounds(db, courseId = null) {
+  const { rows } = await db.query(
+    `SELECT ${ROUND_COLUMNS},
            (SELECT count(*) FROM round_holes h WHERE h.round_id = r.id) AS hole_count,
            (SELECT coalesce(sum(h.putts), 0) FROM round_holes h WHERE h.round_id = r.id) AS putts,
            (SELECT count(*) FROM strokes s
               JOIN round_holes h ON h.id = s.round_hole_id
              WHERE h.round_id = r.id) AS stroke_count
       FROM rounds r JOIN courses c ON c.id = r.course_id
-     ORDER BY r.started_at DESC
-  `);
+     WHERE $1::uuid IS NULL OR r.course_id = $1::uuid
+     ORDER BY r.started_at DESC`,
+    [courseId],
+  );
 
   return rows.map((/** @type {any} */ row) => ({
     ...toRound(row),
@@ -356,6 +364,51 @@ export async function listRounds(db) {
     putts: Number(row.putts),
     strokeCount: Number(row.stroke_count),
   }));
+}
+
+/**
+ * Deletes a round outright — its holes and its strokes with it (UC5 A8).
+ *
+ * The only destructive operation in the system that cannot be argued back from:
+ * a played round is unrepeatable (QG3), so the screen asks before calling this
+ * and this refuses to pretend it deleted something that was not there. The
+ * cascade is the schema's (`round_holes` and `strokes` are ON DELETE CASCADE),
+ * which is why one statement is the whole implementation.
+ *
+ * An unfinished round is deletable like any other: an abandoned round is the
+ * commonest reason to want this, and refusing would leave it undeletable until
+ * it was finished, which it never will be.
+ *
+ * @param {any} db
+ * @param {string} roundId
+ * @returns {Promise<void>}
+ */
+export async function deleteRound(db, roundId) {
+  const { rows } = await db.query('DELETE FROM rounds WHERE id = $1 RETURNING id', [roundId]);
+  if (rows.length === 0) throw new RoundError('unknown-round', 'That round no longer exists.');
+}
+
+/**
+ * Deletes every round on a course, and reports how many there were (UC5 A9).
+ *
+ * It lives here rather than in the catalogue because these are rounds: the
+ * catalogue owns courses, and a module that deletes another component's rows
+ * behind its back is how two truths about a round start. `rounds.course_id` is
+ * ON DELETE RESTRICT, so the catalogue has to come through here to delete a
+ * course the golfer has played — which is exactly the intent.
+ *
+ * Takes a transaction as readily as a connection, so the caller can make the
+ * rounds and the course disappear together or not at all.
+ *
+ * @param {any} db  A connection, or a transaction to enlist in
+ * @param {string} courseId
+ * @returns {Promise<number>} how many rounds were deleted
+ */
+export async function deleteRoundsOfCourse(db, courseId) {
+  const { rows } = await db.query('DELETE FROM rounds WHERE course_id = $1 RETURNING id', [
+    courseId,
+  ]);
+  return rows.length;
 }
 
 /**

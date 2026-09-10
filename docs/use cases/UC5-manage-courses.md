@@ -7,13 +7,13 @@
 
 ## 1. Overview
 
-|                   |                                                                                                                                                                                   |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Use case name** | Manage courses                                                                                                                                                                    |
-| **Actor**         | Golfer — at home before the round, or standing on a tee during one                                                                                                                |
-| **Goal**          | Have the courses they play stored on the device: a name, a number of holes, the par of each hole, and the tee positions that give the map and the first stroke somewhere to start |
-| **Scope**         | Course Catalogue and Local Store, both in the shared foundation, plus Positioning for capturing a tee. Offline throughout                                                         |
-| **Trigger**       | The golfer taps **Manage courses** in the burger menu — or is sent here by UC1, which will not start a round without a course, or by UC3 A2, which needs a tee position           |
+|                   |                                                                                                                                                                                                                                                           |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Use case name** | Manage courses                                                                                                                                                                                                                                            |
+| **Actor**         | Golfer — at home before the round, or standing on a tee during one                                                                                                                                                                                        |
+| **Goal**          | Have the courses they play stored on the device: a name, a number of holes, the par of each hole, and the tee positions that give the map and the first stroke somewhere to start — and be able to remove a round, or a whole course, they no longer want |
+| **Scope**         | Course Catalogue and Local Store, both in the shared foundation, plus Positioning for capturing a tee. Deleting a round reaches the rounds module of the same foundation. Offline throughout                                                              |
+| **Trigger**       | The golfer taps **Manage courses** in the burger menu — or is sent here by UC1, which will not start a round without a course, or by UC3 A2, which needs a tee position                                                                                   |
 
 **Stakeholders and interests**
 
@@ -44,6 +44,9 @@ this is the only use case that can do anything.
 8. At any point, on the same hole rows, the golfer taps a par for each hole
    (A7). Like tee positions, pars are filled in when convenient and never
    block a round.
+9. Below the holes, the course lists the rounds played or planned on it. The
+   golfer deletes any of them after confirming what it costs (A8), and can
+   delete the whole course with its rounds the same way (A9).
 
 ```
 flow addCourse(name, holeCount) {
@@ -72,10 +75,22 @@ flow setPar(courseId, number, par) {
   }
 }
 
-flow deleteCourse(courseId) {
-  if rounds.existForCourse(courseId)
-    fail "Rounds were played or planned on this course"
+flow deleteRound(roundId) {                     -- A8
+  confirmed = golfer.confirms(kind, date, strokeCount)
+  if not confirmed
+    return                                       -- nothing happens on a stray tap
   transaction {
+    rounds.delete(roundId)                       -- holes and strokes cascade
+  } or fail "That round no longer exists"        -- E6
+}
+
+flow deleteCourse(courseId, withRounds) {
+  n = rounds.countForCourse(courseId)
+  if n > 0 and not withRounds
+    fail "n rounds were played or planned on this course"   -- E3
+  transaction {
+    if n > 0
+      rounds.deleteByCourse(courseId)            -- A9, only once confirmed
     courseHoles.deleteByCourse(courseId)
     courses.delete(courseId)
   }
@@ -106,6 +121,13 @@ sequenceDiagram
     G->>C: set par for hole n (3, 4 or 5)
     C->>S: store par
     C-->>G: hole n has a par
+
+    Note over G,S: later still — clearing out what is no longer wanted
+    G->>C: delete a round on this course
+    C-->>G: confirm: kind, date, how many strokes
+    G->>C: yes
+    C->>S: delete round — holes and strokes cascade
+    C-->>G: round gone, course untouched
 ```
 
 ## 3. Alternative flows
@@ -129,7 +151,9 @@ of tee positions; a tee that moved was never two places.
 **A4 — Rename a course.** Allowed at any time, including after rounds have been
 played on it. Rounds reference the course, not its name.
 
-**A5 — Delete a course.** Allowed only while no round references it. See E3.
+**A5 — Delete a course.** Refused on its own while a round references it. The
+golfer either deletes those rounds first (A8) or confirms deleting them with the
+course (A9). See E3.
 
 **A6 — A course with a hole count other than 9 or 18.** Not supported. See
 BR3 and the open question below.
@@ -141,37 +165,60 @@ is a working course, and the review screen says it does not know rather than
 inventing one. Nothing derives from par and nothing copies it onto a round, so
 a par entered after a round was played still describes the hole that was played.
 
+**A8 — Delete a round.** The course screen lists the rounds played or planned on
+that course, newest first, each with its kind, date, holes and stroke count. A
+round the golfer no longer wants — a practice loop, a round they abandoned, a
+plan they have since played — is deleted from there, taking its holes and its
+strokes with it. The confirmation names the round and how many strokes are about
+to go, because there is no undo behind it (BR10). An unfinished round is
+deletable like any other: it is the commonest reason to want this, and it will
+never be finished.
+
+This is a catalogue screen, offline, deliberately (BR7): a round is the golfer's
+own data and removing it must not need a network. The review screen (UC2) stays
+read-only, which is BR1 there.
+
+**A9 — Delete a course with its rounds.** When the golfer deletes a course that
+has rounds, the confirmation says how many rounds will go with it; agreeing
+deletes the rounds and the course together, in one transaction. Declining
+changes nothing. The default is still the refusal in E3 — the cascade happens
+only because the golfer asked for it in the sentence that named the cost.
+
 ## 4. Exception flows
 
 | #   | Condition                                          | System response                                                                                                                                                                                                                       |
 | --- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | E1  | The name is empty or duplicates an existing course | Refused, with the reason. Two courses called "Home" is a way to lose a round                                                                                                                                                          |
 | E2  | No fix when capturing a tee                        | Said plainly, with a retry. The tee position stays null and the course stays usable — unlike a stroke (UC1 E1), a tee that goes unrecorded now can be recorded on the next round, so there is nothing to salvage by storing a bad one |
-| E3  | Delete attempted on a course with rounds           | Refused, naming how many rounds would be lost. Deleting the course would delete the record of rounds that were actually played, which QG3 exists to prevent                                                                           |
+| E3  | Delete attempted on a course with rounds           | Refused by default, naming how many rounds would be lost. It proceeds only when the golfer confirms deleting those rounds too (A9) — the record of rounds actually played is what QG3 exists to protect, so it is never collateral    |
 | E4  | Location permission denied                         | Tee capture is unavailable and says so. Adding and naming courses still works, and A2 remains                                                                                                                                         |
 | E5  | The store write fails                              | Reported as failed. A course that appears in the list but is not stored would break the next round the golfer starts                                                                                                                  |
+| E6  | Delete attempted on a round that is already gone   | Refused and said so, rather than reported as a successful delete of nothing. Two screens open on one device is enough to reach this, and a silent success would teach the golfer that the button is unreliable                        |
+| E7  | The golfer cancels a delete confirmation           | Nothing is deleted and nothing is said. Cancelling is the default answer to both confirmations (BR10)                                                                                                                                 |
 
 ## 5. Business rules
 
-| #   | Rule                                                                                                                                                                                                                                                                                                                                                           |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BR1 | Course data is entered by the golfer. There is no provider, no import and no network in this use case — that is the resolution of OPEN-4                                                                                                                                                                                                                       |
-| BR2 | A course is usable as soon as it has a name and a hole count. Tee positions are optional, always, and forever                                                                                                                                                                                                                                                  |
-| BR3 | A course has 9 or 18 holes, chosen with two large buttons rather than typed                                                                                                                                                                                                                                                                                    |
-| BR4 | Hole numbers are 1..`holeCount`, contiguous, and unique within a course. They are created with the course and never added or removed afterwards                                                                                                                                                                                                                |
-| BR5 | A course cannot be deleted while a round references it                                                                                                                                                                                                                                                                                                         |
-| BR6 | Typing is acceptable here — a course name is typed once, on the couch or before the first tee. QG2's no-typing rule governs capture during play (UC1 BR2), not setup                                                                                                                                                                                           |
-| BR7 | This use case runs offline. The map-based variant A2 is an online addition that writes the same field, never a replacement. Losing the network costs the map, never the course                                                                                                                                                                                 |
-| BR8 | A tee placed on a map has no accuracy, because nothing measured it. A capture from a fix keeps the accuracy the device reported                                                                                                                                                                                                                                |
-| BR9 | **A hole's par is optional and unknown until set.** It is chosen from 3, 4 or 5 rather than typed, and can be cleared. The schema accepts 3..6, because par-6 holes exist; the screen offers the three a golfer taps. A course's par is reported only once every hole has one — a total over half the holes is a smaller number that reads as the course's par |
+| #    | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BR1  | Course data is entered by the golfer. There is no provider, no import and no network in this use case — that is the resolution of OPEN-4                                                                                                                                                                                                                                                                                                    |
+| BR2  | A course is usable as soon as it has a name and a hole count. Tee positions are optional, always, and forever                                                                                                                                                                                                                                                                                                                               |
+| BR3  | A course has 9 or 18 holes, chosen with two large buttons rather than typed                                                                                                                                                                                                                                                                                                                                                                 |
+| BR4  | Hole numbers are 1..`holeCount`, contiguous, and unique within a course. They are created with the course and never added or removed afterwards                                                                                                                                                                                                                                                                                             |
+| BR5  | A course cannot be deleted while a round references it, unless the golfer confirms deleting those rounds with it (A9). The schema keeps `rounds.course_id` ON DELETE RESTRICT either way, so the rounds are always deleted deliberately and never as a side effect of a foreign key                                                                                                                                                         |
+| BR6  | Typing is acceptable here — a course name is typed once, on the couch or before the first tee. QG2's no-typing rule governs capture during play (UC1 BR2), not setup                                                                                                                                                                                                                                                                        |
+| BR7  | This use case runs offline. The map-based variant A2 is an online addition that writes the same field, never a replacement. Losing the network costs the map, never the course                                                                                                                                                                                                                                                              |
+| BR8  | A tee placed on a map has no accuracy, because nothing measured it. A capture from a fix keeps the accuracy the device reported                                                                                                                                                                                                                                                                                                             |
+| BR9  | **A hole's par is optional and unknown until set.** It is chosen from 3, 4 or 5 rather than typed, and can be cleared. The schema accepts 3..6, because par-6 holes exist; the screen offers the three a golfer taps. A course's par is reported only once every hole has one — a total over half the holes is a smaller number that reads as the course's par                                                                              |
+| BR10 | **Deleting a round is permanent and is confirmed before it happens.** There is no undo, no archive and no trash: a round is unrepeatable (QG3), so the confirmation names what is about to be destroyed — the round's kind, date and stroke count, or the number of rounds going with a course — and cancelling is the default. Deleting a round deletes its holes and strokes; it never touches the course, its holes or its tee positions |
 
 ## 6. Data requirements
 
-| Entity            | This use case                                                     |
-| ----------------- | ----------------------------------------------------------------- |
-| `Course`          | Creates, renames, deletes. **Owns**                               |
-| `CourseHole`      | Creates with the course; writes `teePosition` and `par`. **Owns** |
-| `Round`, `Stroke` | Reads only, and only to refuse a delete (E3)                      |
+| Entity                | This use case                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Course`              | Creates, renames, deletes. **Owns**                                                                                                                           |
+| `CourseHole`          | Creates with the course; writes `teePosition` and `par`. **Owns**                                                                                             |
+| `Round`               | Lists per course, and deletes on request (A8, A9). Read and deleted through the rounds module, which owns it — the catalogue never writes rounds' rows itself |
+| `RoundHole`, `Stroke` | Deleted with their round, by the schema's cascade. Never read here                                                                                            |
 
 The catalogue is in the shared foundation (§1.4), so it is on the offline
 critical path by definition. Everything above must work in airplane mode.
@@ -237,6 +284,30 @@ keeping the old number.
 _Given_ a nine-hole course with pars on eight of its holes,
 _when_ the golfer looks at the course list,
 _then_ no par is shown for the course; once the ninth is set, the total appears.
+
+**AC12 — A round is deleted from its course, offline**
+_Given_ the device is in airplane mode and a round has been captured on a
+course,
+_when_ the golfer opens that course, deletes the round and confirms,
+_then_ the round, its holes and its strokes are gone, the course and its tee
+positions are untouched, and no other round is affected.
+
+**AC13 — Cancelling a delete changes nothing**
+_Given_ a course with one round on it,
+_when_ the golfer taps Delete on that round and cancels the confirmation,
+_then_ the round is still there, unchanged.
+
+**AC14 — A course is deleted with its rounds, once that is confirmed**
+_Given_ a course with rounds played or planned on it,
+_when_ the golfer deletes the course and confirms a message naming how many
+rounds will go with it,
+_then_ the course, its holes and exactly those rounds are gone, and rounds on
+other courses are untouched.
+
+**AC15 — Deleting a round that is already gone is refused**
+_Given_ a round that was deleted in another view,
+_when_ the golfer deletes it again,
+_then_ it is refused with a reason, rather than reported as deleted.
 
 ## 8. Open questions
 
