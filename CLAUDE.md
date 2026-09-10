@@ -44,7 +44,7 @@ opposite constraints.
 | [UC2](docs/use%20cases/UC2-show-round.md) | Golfer | Couch, online | Replay a completed round on a map, seeing where each stroke started and ended |
 | [UC3](docs/use%20cases/UC3-plan-round.md) | Golfer | Couch, online | Simulate a round in advance by placing intended strokes on a map, spot by spot |
 | UC4 | Golfer | Couch, online | Compare a played round against the simulation for that hole *(candidate — see [OPEN-5])* |
-| [UC5](docs/use%20cases/UC5-manage-courses.md) | Golfer | Either, offline | Keep the courses they play — name, holes, tee positions — on the device |
+| [UC5](docs/use%20cases/UC5-manage-courses.md) | Golfer | Either, offline | Keep the courses they play — name, holes, tee positions — on the device, and delete rounds or courses they no longer want |
 
 Specified in full under [`docs/use cases/`](docs/use%20cases/README.md): trigger,
 flows, business rules, data and acceptance criteria per use case. UC5 was not in
@@ -178,6 +178,7 @@ flowchart TB
     capture --> loc
     domain --> store
     course --> store
+    course --> domain
 
     linkStyle 0,1,2,3 stroke:#ef6c00,stroke-width:2px
 ```
@@ -202,6 +203,16 @@ constrained Course Catalogue in particular: its data has to be available with no
 network, which made OPEN-4 an architectural question rather than a sourcing
 preference. [UC5](docs/use%20cases/UC5-manage-courses.md) settles it the only way
 the rule allows — the golfer enters the course, so there is nothing to fetch.
+
+Inside the foundation, Course Catalogue now depends on the Domain Model, and
+that edge is deliberate rather than incidental. Deleting a course the golfer has
+played means deleting its rounds, and those rows belong to the Domain Model —
+so the catalogue asks it to delete them instead of reaching into its tables
+(UC5 A9). The schema keeps `rounds.course_id` ON DELETE RESTRICT, which makes
+the detour compulsory rather than polite: a cascade nobody wrote is exactly how
+a golfer's history disappears without anyone deciding it should (QG3). The edge
+points the way the rest of the foundation already does — the Domain Model does
+not know the catalogue exists.
 
 ---
 

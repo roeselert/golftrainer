@@ -490,6 +490,14 @@
         cursor: pointer;
       }
 
+      /* Deleting a round is permanent, so the button that does it does not look
+         like the one beside it that captures a tee. */
+      .row__action--danger {
+        border-color: #6b2b2b;
+        color: #ffc9c9;
+        background: transparent;
+      }
+
       /* The club grid — three across, four down, twelve clubs (UC1 BR11). */
       .clubs {
         display: grid;

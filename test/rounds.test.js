@@ -6,6 +6,8 @@ import {
   RoundError,
   appendStroke,
   clearStrokes,
+  deleteRound,
+  deleteRoundsOfCourse,
   finishHole,
   finishRound,
   holeOf,
@@ -308,4 +310,112 @@ test('the round list carries what the overview shows, newest first', async (t) =
   assert.equal(summary.holeCount, 1);
   assert.equal(summary.courseName, 'Gut Kaden');
   assert.ok(summary.finishedAt instanceof Date);
+});
+
+test('UC5 AC12 — a deleted round takes its holes and strokes with it', async (t) => {
+  const { db, roundId, holeId } = await onTheTee(t);
+  await appendStroke(db, holeId, 'DRIVER', positionAt(53.7, 9.95));
+  await appendStroke(db, holeId, 'IRON_7', null);
+  await finishHole(db, holeId, 2);
+
+  await deleteRound(db, roundId);
+
+  assert.deepEqual(await listRounds(db), []);
+  const { rows } = await db.query(
+    'SELECT (SELECT count(*) FROM round_holes) AS holes, (SELECT count(*) FROM strokes) AS strokes',
+  );
+  assert.equal(Number(rows[0].holes), 0);
+  assert.equal(Number(rows[0].strokes), 0);
+});
+
+test('UC5 AC12 — deleting one round leaves every other round untouched', async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const course = await addCourse(db, { name: 'Gut Kaden', holeCount: 18 });
+
+  const first = await openRound(db, course.id);
+  await appendStroke(db, await openHole(db, first.id, 1), 'DRIVER', null);
+  await finishRound(db, first.id);
+
+  const second = await openRound(db, course.id);
+  const secondHole = await openHole(db, second.id, 1);
+  await appendStroke(db, secondHole, 'IRON_7', null);
+  await appendStroke(db, secondHole, 'PUTTER', null);
+
+  await deleteRound(db, first.id);
+
+  const remaining = await listRounds(db);
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining[0]?.id, second.id);
+  assert.equal(remaining[0]?.strokeCount, 2);
+  // The course itself is not collateral: deleting a round is not deleting a
+  // course (UC5 A8).
+  assert.equal((await holesOf(db, second.id)).length, 1);
+  const { rows } = await db.query('SELECT count(*) AS n FROM courses');
+  assert.equal(Number(rows[0].n), 1);
+});
+
+test('UC5 E6 — deleting a round that is already gone is refused, not ignored', async (t) => {
+  const { db, roundId } = await onTheTee(t);
+  await deleteRound(db, roundId);
+
+  await assert.rejects(
+    () => deleteRound(db, roundId),
+    (error) => error instanceof RoundError && error.code === 'unknown-round',
+  );
+});
+
+test('UC5 A8 — an unfinished round is deletable, which is the point of it', async (t) => {
+  const { db, roundId, holeId } = await onTheTee(t);
+  await appendStroke(db, holeId, 'DRIVER', null);
+
+  assert.ok(await roundInProgress(db));
+  await deleteRound(db, roundId);
+  assert.equal(await roundInProgress(db), null);
+});
+
+test('UC5 A8 — the round list narrows to one course, with the same numbers', async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const kaden = await addCourse(db, { name: 'Gut Kaden', holeCount: 18 });
+  const treudelberg = await addCourse(db, { name: 'Treudelberg', holeCount: 18 });
+
+  const played = await openRound(db, kaden.id);
+  const holeId = await openHole(db, played.id, 1);
+  await appendStroke(db, holeId, 'DRIVER', null);
+  await finishHole(db, holeId, 2);
+  await finishRound(db, played.id);
+
+  await openRound(db, treudelberg.id);
+
+  const here = await listRounds(db, kaden.id);
+  assert.equal(here.length, 1);
+  assert.equal(here[0]?.id, played.id);
+  assert.equal(here[0]?.strokeCount, 1);
+  assert.equal(here[0]?.putts, 2);
+  assert.equal((await listRounds(db, treudelberg.id)).length, 1);
+  assert.equal((await listRounds(db)).length, 2);
+});
+
+test('UC5 A9 — every round of a course goes in one call, and reports how many', async (t) => {
+  const db = await migratedDatabase();
+  t.after(() => db.close());
+
+  const kaden = await addCourse(db, { name: 'Gut Kaden', holeCount: 18 });
+  const treudelberg = await addCourse(db, { name: 'Treudelberg', holeCount: 18 });
+
+  const first = await openRound(db, kaden.id);
+  await appendStroke(db, await openHole(db, first.id, 1), 'DRIVER', null);
+  await finishRound(db, first.id);
+  await openRound(db, kaden.id, 'PLANNED');
+  await openRound(db, treudelberg.id);
+
+  assert.equal(await deleteRoundsOfCourse(db, kaden.id), 2);
+
+  assert.deepEqual(await listRounds(db, kaden.id), []);
+  assert.equal((await listRounds(db)).length, 1);
+  const { rows } = await db.query('SELECT count(*) AS n FROM strokes');
+  assert.equal(Number(rows[0].n), 0);
 });

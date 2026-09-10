@@ -10,6 +10,8 @@
  * round would mean walking the course twice.
  */
 
+import { deleteRoundsOfCourse } from '../rounds/rounds.js';
+
 /**
  * The pars a hole is offered on the catalogue screen (UC5 BR9).
  *
@@ -269,26 +271,41 @@ export async function renameCourse(db, id, name) {
 }
 
 /**
- * Deletes a course, but only while no round references it (UC5 BR5, E3).
+ * Deletes a course. Its rounds go with it only when the caller says so
+ * (UC5 BR5, A9, E3).
  *
- * The count is looked up so the refusal can say what is actually at stake. The
- * schema refuses this too (ON DELETE RESTRICT); this check exists to produce a
- * sentence rather than a constraint violation.
+ * Deleting the rounds is opt-in rather than automatic, and that asymmetry is
+ * the whole safety story: `rounds.course_id` is ON DELETE RESTRICT, so a caller
+ * that has not thought about the rounds gets a refusal that names them rather
+ * than a silent cascade through a golfer's history (QG3). The screen turns that
+ * count into the sentence it asks the golfer to confirm.
+ *
+ * Both halves run in one transaction: a course whose rounds were deleted and
+ * which then survived would leave the catalogue lying about what was played.
  *
  * @param {any} db
  * @param {string} id
- * @returns {Promise<void>}
+ * @param {object} [options]
+ * @param {boolean} [options.withRounds]  Delete the rounds played or planned on it too
+ * @returns {Promise<number>} how many rounds were deleted with it
  */
-export async function deleteCourse(db, id) {
-  const { rows } = await db.query('SELECT count(*) AS n FROM rounds WHERE course_id = $1', [id]);
-  const rounds = Number(rows[0].n);
-  if (rounds > 0) {
-    throw new CatalogueError(
-      'course-in-use',
-      `${rounds} ${rounds === 1 ? 'round was' : 'rounds were'} played or planned on this course. ` +
-        'Deleting it would delete them too.',
-    );
-  }
+export async function deleteCourse(db, id, { withRounds = false } = {}) {
+  return db.transaction(async (/** @type {any} */ tx) => {
+    const { rows } = await tx.query('SELECT count(*) AS n FROM rounds WHERE course_id = $1', [id]);
+    const rounds = Number(rows[0].n);
 
-  await db.query('DELETE FROM courses WHERE id = $1', [id]);
+    if (rounds > 0 && !withRounds) {
+      throw new CatalogueError(
+        'course-in-use',
+        `${rounds} ${rounds === 1 ? 'round was' : 'rounds were'} played or planned on this course. ` +
+          'Deleting it would delete them too.',
+      );
+    }
+
+    // Through the rounds module rather than a DELETE written here: those are
+    // its rows, and the schema's RESTRICT is what forces the detour.
+    if (rounds > 0) await deleteRoundsOfCourse(tx, id);
+    await tx.query('DELETE FROM courses WHERE id = $1', [id]);
+    return rounds;
+  });
 }

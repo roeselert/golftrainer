@@ -8,9 +8,11 @@
  * Three constraints here are load-bearing rather than decorative:
  *
  *   - `rounds.course_id` is ON DELETE RESTRICT. A course with rounds cannot be
- *     deleted (UC5 BR5) — deleting it would destroy the record of rounds that
- *     were actually played, which QG3 exists to prevent. The UI explains it;
- *     the database refuses it.
+ *     deleted by accident (UC5 BR5) — deleting it would destroy the record of
+ *     rounds that were actually played, which QG3 exists to prevent. The golfer
+ *     can still ask for both to go (UC5 A9), and RESTRICT is what makes that a
+ *     decision: the catalogue has to delete the rounds itself, in the same
+ *     transaction, rather than have a foreign key quietly do it.
  *   - Positions are nullable *in pairs*. A stroke may have no position at all
  *     (UC1 E1: no fix, save the stroke anyway), but half a position is a bug.
  *   - `strokes` has no UNIQUE on position, and deliberately so. Two strokes at
